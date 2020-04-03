@@ -50,8 +50,7 @@ def next_gen(stat, init_struc_data, opt_struc_data, rslt_data, ea_id_data):
     # ------ instantiate Crossover class
     if rin.n_crsov > 0:
         co = Crossover(rin.atype, rin.nat, rin.mindist,
-                       rin.crs_lat, rin.crs_func,
-                       rin.nat_diff_tole, rin.maxcnt_ea)
+                       rin.crs_lat, rin.nat_diff_tole, rin.maxcnt_ea)
         eagen.gen_crossover(rin.n_crsov, co=co)    # crossover
         with open('cryspy.out', 'a') as fout:
             fout.write('{} structures by crossover\n'.format(rin.n_crsov))
@@ -122,7 +121,7 @@ def next_gen(stat, init_struc_data, opt_struc_data, rslt_data, ea_id_data):
     # ---------- ea_info
     tmp_info = pd.Series([gen, rin.n_pop, rin.n_crsov, rin.n_perm,
                           rin.n_strain, rin.n_rand, rin.n_elite,
-                          rin.crs_func, rin.crs_lat, rin.slct_func],
+                          rin.crs_lat, rin.slct_func],
                          index=ea_info.columns)
     ea_info = ea_info.append(tmp_info, ignore_index=True)
     # ------ out ea_info

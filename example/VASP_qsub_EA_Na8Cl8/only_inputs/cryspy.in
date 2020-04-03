@@ -1,7 +1,7 @@
 [basic]
 algo = EA
 calc_code = VASP
-tot_struc = 20
+tot_struc = 10
 natot = 16
 atype = Na Cl
 nat = 8 8

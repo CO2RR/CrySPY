@@ -29,6 +29,8 @@ version 0.8.0 (2020 February 16)
 - pandas
 - [pymatgen](http://pymatgen.org "pymatgen")
 
+Tested with Python 3.7.5 on Mac and Python 3.6.7 (miniconda3-4.3.30) on Linux (super computer).
+
 ### Structure optimizer
 At least one optimizer is required.
 

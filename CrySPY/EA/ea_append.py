@@ -47,8 +47,7 @@ def append_struc(stat, init_struc_data):
     # ------ instantiate Crossover class
     if rin.n_crsov > 0:
         co = Crossover(rin.atype, rin.nat, rin.mindist,
-                       rin.crs_lat, rin.crs_func,
-                       rin.nat_diff_tole, rin.maxcnt_ea)
+                       rin.crs_lat, rin.nat_diff_tole, rin.maxcnt_ea)
         eagen.gen_crossover(rin.n_crsov, co=co)    # crossover
         with open('cryspy.out', 'a') as fout:
             fout.write('{} structures by crossover\n'.format(rin.n_crsov))
@@ -97,7 +96,7 @@ def append_struc(stat, init_struc_data):
         ea_info = pd.DataFrame(columns=['Gen', 'Population',
                                         'Crossover', 'Permutation', 'Strain',
                                         'Random', 'Elite',
-                                        'crs_func', 'crs_lat', 'slct_func'])
+                                        'crs_lat', 'slct_func'])
         ea_info.iloc[:, 0:7] = ea_info.iloc[:, 0:7].astype(int)
         # -- ea_origin
         ea_origin = pd.DataFrame(columns=['Gen', 'Struc_ID',
@@ -107,7 +106,7 @@ def append_struc(stat, init_struc_data):
     # ---------- ea_info
     tmp_info = pd.Series([rin.tot_struc, rin.n_pop, rin.n_crsov,
                           rin.n_perm, rin.n_strain, rin.n_rand, 0,
-                          rin.crs_func, rin.crs_lat, rin.slct_func],
+                          rin.crs_lat, rin.slct_func],
                          index=ea_info.columns)
     ea_info = ea_info.append(tmp_info, ignore_index=True)
     # ------ out ea_info

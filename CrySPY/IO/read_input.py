@@ -108,7 +108,7 @@ def readin():
         try:
             fp_sigma = config.getfloat('BO', 'fp_sigma')
         except configparser.NoOptionError:
-            fp_sigma = 0.2
+            fp_sigma = 1.0
         if fp_sigma < 0:
             raise ValueError('fp_sigma < 0, check fp_sigma')
         # -- BO option
@@ -347,7 +347,7 @@ def readin():
         global n_pop, n_crsov, n_perm, n_strain, n_rand, n_elite
         global fit_reverse, n_fittest
         global slct_func, t_size, a_rlt, b_rlt
-        global crs_lat, crs_func, nat_diff_tole, ntimes, sigma_st,  maxcnt_ea
+        global crs_lat, nat_diff_tole, ntimes, sigma_st,  maxcnt_ea
         global maxgen_ea
         # global restart_gen
         # ------ read intput variables
@@ -402,7 +402,7 @@ def readin():
             try:
                 a_rlt = config.getfloat('EA', 'a_rlt')
             except configparser.NoOptionError:
-                a_rlt = 2.0
+                a_rlt = 10.0
             try:
                 b_rlt = config.getfloat('EA', 'b_rlt')
             except configparser.NoOptionError:
@@ -414,12 +414,6 @@ def readin():
             crs_lat = 'equal'
         if crs_lat not in ['equal', 'random']:
             raise ValueError('crs_lat must be equal or random')
-        try:
-            crs_func = config.get('EA', 'crs_func')
-        except configparser.NoOptionError:
-            crs_func = 'OP'
-        if crs_func not in ['OP', 'TP']:
-            raise ValueError('crs_func must be OP or TP')
         try:
             nat_diff_tole = config.getint('EA', 'nat_diff_tole')
         except configparser.NoOptionError:
@@ -538,7 +532,6 @@ def writeout():
                 fout.write('a_rlt = {}\n'.format(a_rlt))
                 fout.write('b_rlt = {}\n'.format(b_rlt))
             fout.write('crs_lat = {}\n'.format(crs_lat))
-            fout.write('crs_func = {}\n'.format(crs_func))
             fout.write('nat_diff_tole = {}\n'.format(nat_diff_tole))
             fout.write('ntimes = {}\n'.format(ntimes))
             fout.write('sigma_st = {}\n'.format(sigma_st))
@@ -666,7 +659,6 @@ def save_stat(stat):
         elif slct_func == 'RLT':
             stat.set('input', 'a_rlt', '{}'.format(a_rlt))
             stat.set('input', 'b_rlt', '{}'.format(b_rlt))
-        stat.set('input', 'crs_func', '{}'.format(crs_func))
         stat.set('input', 'crs_lat', '{}'.format(crs_lat))
         stat.set('input', 'nat_diff_tole', '{}'.format(nat_diff_tole))
         stat.set('input', 'ntimes', '{}'.format(ntimes))
@@ -794,7 +786,6 @@ def diffinstat(stat):
             old_a_rlt = stat.getfloat('input', 'a_rlt')
             old_b_rlt = stat.getfloat('input', 'b_rlt')
         old_crs_lat = stat.get('input', 'crs_lat')
-        old_crs_func = stat.get('input', 'crs_func')
         old_nat_diff_tole = stat.getint('input', 'nat_diff_tole')
         old_ntimes = stat.getint('input', 'ntimes')
         old_sigma_st = stat.getfloat('input', 'sigma_st')
@@ -1003,10 +994,6 @@ def diffinstat(stat):
                 diff_out('b_rlt', old_b_rlt, b_rlt)
                 io_stat.set_input_common(stat, 'b_rlt', b_rlt)
                 logic_change = True
-        if not old_crs_func == crs_func:
-            diff_out('crs_func', old_crs_func, crs_func)
-            io_stat.set_input_common(stat, 'crs_func', crs_func)
-            logic_change = True
         if not old_crs_lat == crs_lat:
             diff_out('crs_lat', old_crs_lat, crs_lat)
             io_stat.set_input_common(stat, 'crs_lat', crs_lat)
