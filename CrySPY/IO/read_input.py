@@ -17,8 +17,8 @@ def readin():
 
     # ---------- basic
     # ------ global declaration
-    global algo, calc_code, tot_struc, natot
-    global atype, nat, nstage, njob, jobcmd, jobfile
+    global algo, calc_code, tot_struc
+    global nstage, njob, jobcmd, jobfile
     # ------ read intput variables
     algo = config.get('basic', 'algo')
     if algo not in ['RS', 'BO', 'LAQA', 'EA']:
@@ -33,17 +33,6 @@ def readin():
     tot_struc = config.getint('basic', 'tot_struc')
     if tot_struc <= 0:
         raise ValueError('tot_struc <= 0, check tot_struc')
-    natot = config.getint('basic', 'natot')
-    if natot <= 0:
-        raise ValueError('natot <= 0, check natot')
-    atype = config.get('basic', 'atype')
-    atype = [a for a in atype.split()]    # list
-    nat = config.get('basic', 'nat')
-    nat = [int(x) for x in nat.split()]    # character --> integer
-    if not len(nat) == len(atype):
-        raise ValueError('not len(nat) == len(atype), check atype and nat')
-    if not sum(nat) == natot:
-        raise ValueError('not sum(nat) == natot, check natot and nat')
     nstage = config.getint('basic', 'nstage')
     if nstage <= 0:
         raise ValueError('nstage <= 0, check nstage')
@@ -55,6 +44,171 @@ def readin():
         raise ValueError('njob <= 0, check njob')
     jobcmd = config.get('basic', 'jobcmd')
     jobfile = config.get('basic', 'jobfile')
+
+    # ---------- structure
+    # ------ global declaration
+    global struc_mode, natot, atype, nat, mol_file, nmol
+    global vol_mu, vol_sigma, maxcnt, symprec, spgnum, use_find_wy
+    # ------ read intput variables
+    try:
+        struc_mode = config.get('structure', 'struc_mode')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        struc_mode = 'crystal'
+    if struc_mode not in ['crystal', 'mol', 'host']:
+        raise ValueError('struc_mode is wrong')
+    natot = config.getint('structure', 'natot')
+    if natot <= 0:
+        raise ValueError('natot <= 0, check natot')
+    atype = config.get('structure', 'atype')
+    atype = [a for a in atype.split()]    # list
+    nat = config.get('structure', 'nat')
+    nat = [int(x) for x in nat.split()]    # character --> integer
+    if not len(nat) == len(atype):
+        raise ValueError('not len(nat) == len(atype), check atype and nat')
+    if not sum(nat) == natot:
+        raise ValueError('not sum(nat) == natot, check natot and nat')
+    # -- mol
+    if struc_mode == 'mol':
+        mol_file = config.get('structure', 'mol_file')
+        mol_file = [a for a in mol_file.split()]    # list
+        nmol = config.get('structure', 'nmol')
+        nmol = [int(x) for x in nmol.split()]    # character --> integer
+        if not len(mol_file) == len(nmol):
+            raise ValueError('not len(mol_file) == len(nmol)')
+    else:
+        mol_file = None
+        nmol = None
+    # --
+    try:
+        vol_mu = config.getfloat('structure', 'vol_mu')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        vol_mu = None
+    if vol_mu is not None:
+        if vol_mu <= 0.0:
+            raise ValueError('vol_mu must be positive float')
+    try:
+        vol_sigma = config.getfloat('structure', 'vol_sigma')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        vol_sigma = None
+    try:
+        maxcnt = config.getint('structure', 'maxcnt')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        maxcnt = 50
+    if maxcnt < 0:
+        raise ValueError('maxcnt must be positive int')
+    try:
+        symprec = config.getfloat('structure', 'symprec')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        symprec = 0.01
+    if symprec < 0.0:
+        raise ValueError('symprec must be positive float')
+    try:
+        spgnum = config.get('structure', 'spgnum')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        spgnum = 'all'
+    if spgnum == '0':
+        if struc_mode == 'mol':
+            raise ValueError('spgnum = 0 is not allow when struc_mode is  mol')
+        spgnum = 0
+    elif spgnum == 'all':
+        pass
+    else:
+        spgnum = spglist(spgnum)
+    try:
+        use_find_wy = config.getboolean('structure', 'use_find_wy')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        use_find_wy = False
+    if use_find_wy:
+        if not struc_mode == 'crystal':
+            raise ValueError('find_wy can be use if struc_mode is crystal')
+    # ------ spgnum == 0 or use_find_wy
+    if spgnum == 0 or use_find_wy:
+        # -- global declaration
+        global minlen, maxlen, dangle, mindist
+        # -- read input variables
+        minlen = config.getfloat('structure', 'minlen')
+        maxlen = config.getfloat('structure', 'maxlen')
+        dangle = config.getfloat('structure', 'dangle')
+        if minlen <= 0.0:
+            raise ValueError('minlen must be positive')
+        if minlen > maxlen:
+            raise ValueError('minlen > maxlen')
+        if dangle <= 0.0:
+            raise ValueError('dangle < 0.0, dangle must be positive')
+        mindist = []
+        for i in range(len(atype)):
+            tmp = config.get('structure', 'mindist_{}'.format(i+1))
+            tmp = [float(x) for x in tmp.split()]    # character --> float
+            if not len(tmp) == len(atype):
+                raise ValueError('not len(mindist_{}) == len(atype)'.format(i+1))
+            mindist.append(tmp)
+        # -- check symmetric matrix
+        for i in range(len(mindist)):
+            for j in range(len(mindist)):
+                if i < j:
+                    if not mindist[i][j] == mindist[j][i]:
+                        raise ValueError('mindist is not symmetric. ({}, {}) -->'
+                                         ' {}, ({}, {}) --> {}'.format(
+                                             i, j, mindist[i][j],
+                                             j, i, mindist[j][i]))
+
+    # ---------- option
+    # ------ global declaration
+    global stop_chkpt
+    global load_struc_flag, stop_next_struc, recalc
+    global append_struc_ea
+    global energy_step_flag, struc_step_flag, fs_step_flag
+
+    # ------ read intput variables
+    try:
+        stop_chkpt = config.getint('option', 'stop_chkpt')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        stop_chkpt = 0
+    try:
+        load_struc_flag = config.getboolean('option', 'load_struc_flag')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        load_struc_flag = False
+    try:
+        stop_next_struc = config.getboolean('option', 'stop_next_struc')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        stop_next_struc = False
+    try:
+        recalc = config.get('option', 'recalc')
+        recalc = [int(x) for x in recalc.split()]    # character --> integer
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        recalc = []
+    if recalc:
+        for i in recalc:
+            if not 0 <= i < tot_struc:
+                raise ValueError('recalc must be non-negative int'
+                                 ' and less than tot_struc')
+    try:
+        append_struc_ea = config.getboolean('option', 'append_struc_ea')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        append_struc_ea = False
+    try:
+        energy_step_flag = config.getboolean('option', 'energy_step_flag')
+        # -- only VASP or QE for now
+        if calc_code in ['soiap', 'LAMMPS']:
+            energy_step_flag = False
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        energy_step_flag = False
+    try:
+        struc_step_flag = config.getboolean('option', 'struc_step_flag')
+        # -- only VASP or QE for now
+        if calc_code in ['soiap', 'LAMMPS']:
+            struc_step_flag = False
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        struc_step_flag = False
+    try:
+        fs_step_flag = config.getboolean('option', 'fs_step_flag')
+        # -- only VASP or QE for now
+        if calc_code in ['soiap', 'LAMMPS']:
+            fs_step_flag = False
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        fs_step_flag = False
+    if algo == 'LAQA':
+        fs_step_flag = True
 
     # ---------- BO
     if algo == 'BO':
@@ -142,210 +296,11 @@ def readin():
             weight_laqa = 1.0
 
     # ---------- EA
-    # EA part is written below option section
-
-    # ---------- lattice
-    # ------ global declaration
-    global minlen, maxlen, dangle, mindist
-    # ------ read intput variables
-    minlen = config.getfloat('lattice', 'minlen')
-    maxlen = config.getfloat('lattice', 'maxlen')
-    dangle = config.getfloat('lattice', 'dangle')
-    if minlen <= 0.0:
-        raise ValueError('minlen must be positive')
-    if minlen > maxlen:
-        raise ValueError('minlen > maxlen')
-    if dangle <= 0.0:
-        raise ValueError('dangle < 0.0, dangle must be positive')
-    mindist = []
-    for i in range(len(atype)):
-        tmp = config.get('lattice', 'mindist_{}'.format(i+1))
-        tmp = [float(x) for x in tmp.split()]    # character --> float
-        if not len(tmp) == len(atype):
-            raise ValueError('not len(mindist_{}) == len(atype)'.format(i+1))
-        mindist.append(tmp)
-    # -- check symmetric matrix
-    for i in range(len(mindist)):
-        for j in range(len(mindist)):
-            if i < j:
-                if not mindist[i][j] == mindist[j][i]:
-                    raise ValueError('mindist is not symmetric. ({}, {}) -->'
-                                     ' {}, ({}, {}) --> {}'.format(
-                                         i, j, mindist[i][j],
-                                         j, i, mindist[j][i]))
-
-    # ---------- global declaration for comman part in calc_code
-    global kppvol, kpt_flag, force_gamma
-
-    # ---------- VASP
-    if calc_code == 'VASP':
-        # ------ read intput variables
-        kpt_flag = True
-        kppvol = config.get('VASP', 'kppvol')
-        kppvol = [int(x) for x in kppvol.split()]    # character --> int
-        if not len(kppvol) == nstage:
-            raise ValueError('not len(kppvol) == nstage,'
-                             ' check kppvol and nstage')
-        try:
-            force_gamma = config.getboolean('VASP', 'force_gamma')
-        except configparser.NoOptionError:
-            force_gamma = False
-
-    # ---------- QE
-    elif calc_code == 'QE':
-        # ------ global declaration
-        global qe_infile, qe_outfile
-        # ------ read intput variables
-        kpt_flag = True
-        qe_infile = config.get('QE', 'qe_infile')
-        qe_outfile = config.get('QE', 'qe_outfile')
-        kppvol = config.get('QE', 'kppvol')
-        kppvol = [int(x) for x in kppvol.split()]    # character --> int
-        if not len(kppvol) == nstage:
-            raise ValueError('not len(kppvol) == nstage,'
-                             ' check kppvol and nstage')
-        try:
-            force_gamma = config.getboolean('QE', 'force_gamma')
-        except configparser.NoOptionError:
-            force_gamma = False
-    
-    # ---------- OpenMX
-    elif calc_code == 'OMX':
-        # ------ global declaration
-        global OMX_infile, OMX_outfile
-        global upSpin, downSpin
-        upSpin   = {}
-        downSpin = {}
-        # ------ read intput variables
-        kpt_flag   = True
-        OMX_infile  = config.get('OMX', 'OMX_infile')
-        OMX_outfile = config.get('OMX', 'OMX_outfile')
-        ValenceElec = config.get('OMX', 'ValenceElectrons')
-        ValElecIn = ValenceElec.split()
-        for i in range(0, len(ValElecIn), 3):
-            upSpin[ValElecIn[i]]   = ValElecIn[i+1]
-            downSpin[ValElecIn[i]] = ValElecIn[i+2]
-        kppvol = config.get('OMX', 'kppvol')
-        kppvol = [int(x) for x in kppvol.split()]    # character --> int
-        if not len(kppvol) == nstage:
-            raise ValueError('not len(kppvol) == nstage,'
-                            ' check kppvol and nstage')
-        try:
-            force_gamma = config.getboolean('OMX', 'force_gamma')
-        except configparser.NoOptionError:
-            force_gamma = False
-
-    # ---------- soiap
-    elif calc_code == 'soiap':
-        # ------ global declaration
-        global soiap_infile, soiap_outfile, soiap_cif
-        # ------ read intput variables
-        soiap_infile = config.get('soiap', 'soiap_infile')
-        soiap_outfile = config.get('soiap', 'soiap_outfile')
-        soiap_cif = config.get('soiap', 'soiap_cif')
-        kpt_flag = False
-        force_gamma = False
-
-    # ---------- lammps
-    elif calc_code == 'LAMMPS':
-        # ------ global declaration
-        global lammps_infile, lammps_outfile, lammps_potential, lammps_data
-        # ------ read intput variables
-        lammps_infile = config.get('LAMMPS', 'lammps_infile')
-        lammps_outfile = config.get('LAMMPS', 'lammps_outfile')
-        try:
-            lammps_potential = config.get('LAMMPS', 'lammps_potential')
-            lammps_potential = lammps_potential.split()
-        except configparser.NoOptionError:
-            lammps_potential = None
-        lammps_data = config.get('LAMMPS', 'lammps_data')
-        kpt_flag = False
-        force_gamma = False
-    else:
-        raise NotImplementedError('calc_code must be VASP, QE, soiap,'
-                                  ' or LAMMPS')
-
-    # ---------- option
-    # ------ global declaration
-    global maxcnt, stop_chkpt, symprec, spgnum
-    global load_struc_flag, stop_next_struc, recalc
-    global append_struc_ea
-    global energy_step_flag, struc_step_flag, fs_step_flag
-
-    # ------ read intput variables
-    try:
-        maxcnt = config.getint('option', 'maxcnt')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        maxcnt = 50
-    try:
-        stop_chkpt = config.getint('option', 'stop_chkpt')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        stop_chkpt = 0
-    try:
-        symprec = config.getfloat('option', 'symprec')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        symprec = 0.001
-    try:
-        spgnum = config.get('option', 'spgnum')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        spgnum = 'all'
-    if spgnum == '0':
-        spgnum = 0
-    elif spgnum == 'all':
-        pass
-    else:
-        spgnum = spglist(spgnum)
-    try:
-        load_struc_flag = config.getboolean('option', 'load_struc_flag')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        load_struc_flag = False
-    try:
-        stop_next_struc = config.getboolean('option', 'stop_next_struc')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        stop_next_struc = False
-    try:
-        recalc = config.get('option', 'recalc')
-        recalc = [int(x) for x in recalc.split()]    # character --> integer
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        recalc = []
-    if recalc:
-        for i in recalc:
-            if not 0 <= i < tot_struc:
-                raise ValueError('recalc must be non-negative int'
-                                 ' and less than tot_struc')
-    try:
-        append_struc_ea = config.getboolean('option', 'append_struc_ea')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        append_struc_ea = False
-    try:
-        energy_step_flag = config.getboolean('option', 'energy_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
-            energy_step_flag = False
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        energy_step_flag = False
-    try:
-        struc_step_flag = config.getboolean('option', 'struc_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
-            struc_step_flag = False
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        struc_step_flag = False
-    try:
-        fs_step_flag = config.getboolean('option', 'fs_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
-            fs_step_flag = False
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        fs_step_flag = False
-    if algo == 'LAQA':
-        fs_step_flag = True
-
-    # ---------- EA
     if algo == 'EA' or append_struc_ea:
         # ------ global declaration
         global n_pop, n_crsov, n_perm, n_strain, n_rand, n_elite
         global fit_reverse, n_fittest
+        global mindist_ea
         global slct_func, t_size, a_rlt, b_rlt
         global crs_lat, nat_diff_tole, ntimes, sigma_st,  maxcnt_ea
         global maxgen_ea
@@ -376,7 +331,7 @@ def readin():
         n_elite = config.getint('EA', 'n_elite')
         if n_elite < 0:
             raise ValueError('n_elite must be non-negative int')
-        # -- fittest
+        # -- n_fittest
         try:
             fit_reverse = config.getboolean('EA', 'fit_reverse')
         except configparser.NoOptionError:
@@ -387,6 +342,23 @@ def readin():
             n_fittest = 0
         if n_fittest < 0:
             raise ValueError('n_fittest must be zero or positive int')
+        # -- mindist_ea
+        mindist_ea = []
+        for i in range(len(atype)):
+            tmp = config.get('EA', 'mindist_ea_{}'.format(i+1))
+            tmp = [float(x) for x in tmp.split()]    # character --> float
+            if not len(tmp) == len(atype):
+                raise ValueError('not len(mindist_ea_{}) == len(atype)'.format(i+1))
+            mindist_ea.append(tmp)
+        # -- check symmetric matrix
+        for i in range(len(mindist_ea)):
+            for j in range(len(mindist_ea)):
+                if i < j:
+                    if not mindist_ea[i][j] == mindist_ea[j][i]:
+                        raise ValueError('mindist_ea is not symmetric. ({}, {}) -->'
+                                         ' {}, ({}, {}) --> {}'.format(
+                                             i, j, mindist_ea[i][j],
+                                             j, i, mindist_ea[j][i]))
         # -- select function
         slct_func = config.get('EA', 'slct_func')
         if slct_func not in ['TNM', 'RLT']:
@@ -451,6 +423,97 @@ def readin():
         # except configparser.NoOptionError:
         #     restart_gen = 0
 
+    # ---------- global declaration for comman part in calc_code
+    global kppvol, kpt_flag, force_gamma
+
+    # ---------- VASP
+    if calc_code == 'VASP':
+        # ------ read intput variables
+        kpt_flag = True
+        kppvol = config.get('VASP', 'kppvol')
+        kppvol = [int(x) for x in kppvol.split()]    # character --> int
+        if not len(kppvol) == nstage:
+            raise ValueError('not len(kppvol) == nstage,'
+                             ' check kppvol and nstage')
+        try:
+            force_gamma = config.getboolean('VASP', 'force_gamma')
+        except configparser.NoOptionError:
+            force_gamma = False
+
+    # ---------- QE
+    elif calc_code == 'QE':
+        # ------ global declaration
+        global qe_infile, qe_outfile
+        # ------ read intput variables
+        kpt_flag = True
+        qe_infile = config.get('QE', 'qe_infile')
+        qe_outfile = config.get('QE', 'qe_outfile')
+        kppvol = config.get('QE', 'kppvol')
+        kppvol = [int(x) for x in kppvol.split()]    # character --> int
+        if not len(kppvol) == nstage:
+            raise ValueError('not len(kppvol) == nstage,'
+                             ' check kppvol and nstage')
+        try:
+            force_gamma = config.getboolean('QE', 'force_gamma')
+        except configparser.NoOptionError:
+            force_gamma = False
+
+    # ---------- OpenMX
+    elif calc_code == 'OMX':
+        # ------ global declaration
+        global OMX_infile, OMX_outfile
+        global upSpin, downSpin
+        upSpin   = {}
+        downSpin = {}
+        # ------ read intput variables
+        kpt_flag   = True
+        OMX_infile  = config.get('OMX', 'OMX_infile')
+        OMX_outfile = config.get('OMX', 'OMX_outfile')
+        ValenceElec = config.get('OMX', 'ValenceElectrons')
+        ValElecIn = ValenceElec.split()
+        for i in range(0, len(ValElecIn), 3):
+            upSpin[ValElecIn[i]]   = ValElecIn[i+1]
+            downSpin[ValElecIn[i]] = ValElecIn[i+2]
+        kppvol = config.get('OMX', 'kppvol')
+        kppvol = [int(x) for x in kppvol.split()]    # character --> int
+        if not len(kppvol) == nstage:
+            raise ValueError('not len(kppvol) == nstage,'
+                            ' check kppvol and nstage')
+        try:
+            force_gamma = config.getboolean('OMX', 'force_gamma')
+        except configparser.NoOptionError:
+            force_gamma = False
+
+    # ---------- soiap
+    elif calc_code == 'soiap':
+        # ------ global declaration
+        global soiap_infile, soiap_outfile, soiap_cif
+        # ------ read intput variables
+        soiap_infile = config.get('soiap', 'soiap_infile')
+        soiap_outfile = config.get('soiap', 'soiap_outfile')
+        soiap_cif = config.get('soiap', 'soiap_cif')
+        kpt_flag = False
+        force_gamma = False
+
+    # ---------- lammps
+    elif calc_code == 'LAMMPS':
+        # ------ global declaration
+        global lammps_infile, lammps_outfile, lammps_potential, lammps_data
+        # ------ read intput variables
+        lammps_infile = config.get('LAMMPS', 'lammps_infile')
+        lammps_outfile = config.get('LAMMPS', 'lammps_outfile')
+        try:
+            lammps_potential = config.get('LAMMPS', 'lammps_potential')
+            lammps_potential = lammps_potential.split()
+        except configparser.NoOptionError:
+            lammps_potential = None
+        lammps_data = config.get('LAMMPS', 'lammps_data')
+        kpt_flag = False
+        force_gamma = False
+    else:
+        raise NotImplementedError('calc_code must be VASP, QE, soiap,'
+                                  ' or LAMMPS')
+
 
 def spglist(spgnum):
     tmpspg = []
@@ -479,18 +542,49 @@ def writeout():
     # ---------- write input data in output file
     print('Write input data in cryspy.out')
     with open('cryspy.out', 'a') as fout:
+        # ------ basic section
         fout.write('# ---------- Read cryspy.in (at 1st run)\n')
         fout.write('# ------ basic section\n')
         fout.write('algo = {}\n'.format(algo))
         fout.write('calc_code = {}\n'.format(calc_code))
         fout.write('tot_struc = {}\n'.format(tot_struc))
-        fout.write('natot = {}\n'.format(natot))
-        fout.write('atype = {}\n'.format(' '.join(a for a in atype)))
-        fout.write('nat = {}\n'.format(' '.join(str(b) for b in nat)))
         fout.write('nstage = {}\n'.format(nstage))
         fout.write('njob = {}\n'.format(njob))
         fout.write('jobcmd = {}\n'.format(jobcmd))
         fout.write('jobfile = {}\n'.format(jobfile))
+
+        # ------ structure section
+        fout.write('# ------ structure section\n')
+        fout.write('struc_mode = {}\n'.format(struc_mode))
+        fout.write('natot = {}\n'.format(natot))
+        fout.write('atype = {}\n'.format(' '.join(a for a in atype)))
+        fout.write('nat = {}\n'.format(' '.join(str(b) for b in nat)))
+        if mol_file is None:
+            fout.write('mol_file = {}\n'.format(mol_file))
+        else:
+            fout.write('mol_file = {}\n'.format(' '.join(a for a in mol_file)))
+        if nmol is None:
+            fout.write('nmol = {}\n'.format(nmol))
+        else:
+            fout.write('nmol = {}\n'.format(' '.join(str(b) for b in nmol)))
+        fout.write('vol_mu = {}\n'.format(vol_mu))
+        fout.write('vol_sigma = {}\n'.format(vol_sigma))
+        fout.write('maxcnt = {}\n'.format(maxcnt))
+        fout.write('symprec = {}\n'.format(symprec))
+        if spgnum == 0 or spgnum == 'all':
+            fout.write('spgnum = {}\n'.format(spgnum))
+        else:
+            fout.write('spgnum = {}\n'.format(
+                ' '.join(str(d) for d in spgnum)))
+        fout.write('use_find_wy = {}\n'.format(use_find_wy))
+        # -- spgnum == 0 or use_find_wy
+        if spgnum == 0 or use_find_wy:
+            fout.write('minlen = {}\n'.format(minlen))
+            fout.write('maxlen = {}\n'.format(maxlen))
+            fout.write('dangle = {}\n'.format(dangle))
+            for i in range(len(atype)):
+                fout.write('mindist_{0} = {1}\n'.format(
+                    i+1, ' '.join(str(c) for c in mindist[i])))
 
         # ------ BO
         if algo == 'BO':
@@ -525,6 +619,9 @@ def writeout():
             fout.write('n_elite = {}\n'.format(n_elite))
             fout.write('fit_reverse = {}\n'.format(fit_reverse))
             fout.write('n_fittest = {}\n'.format(n_fittest))
+            for i in range(len(atype)):
+                fout.write('mindist_ea_{0} = {1}\n'.format(
+                    i+1, ' '.join(str(c) for c in mindist_ea[i])))
             fout.write('slct_func = {}\n'.format(slct_func))
             if slct_func == 'TNM':
                 fout.write('t_size = {}\n'.format(t_size))
@@ -538,15 +635,6 @@ def writeout():
             fout.write('maxcnt_ea = {}\n'.format(maxcnt_ea))
             fout.write('maxgen_ea = {}\n'.format(maxgen_ea))
 #            fout.write('restart_gen = {}\n'.format(restart_gen))
-
-        # ------ lattice
-        fout.write('# ------ lattice section\n')
-        fout.write('minlen = {}\n'.format(minlen))
-        fout.write('maxlen = {}\n'.format(maxlen))
-        fout.write('dangle = {}\n'.format(dangle))
-        for i in range(len(atype)):
-            fout.write('mindist_{0} = {1}\n'.format(
-                i+1, ' '.join(str(c) for c in mindist[i])))
 
         # ------ VASP
         if calc_code == 'VASP':
@@ -591,14 +679,7 @@ def writeout():
 
         # ------ option
         fout.write('# ------ option section\n')
-        fout.write('maxcnt = {}\n'.format(maxcnt))
         fout.write('stop_chkpt = {}\n'.format(stop_chkpt))
-        fout.write('symprec = {}\n'.format(symprec))
-        if spgnum == 0 or spgnum == 'all':
-            fout.write('spgnum = {}\n'.format(spgnum))
-        else:
-            fout.write('spgnum = {}\n'.format(
-                ' '.join(str(d) for d in spgnum)))
         fout.write('load_struc_flag = {}\n'.format(load_struc_flag))
         fout.write('stop_next_struc = {}\n'.format(stop_next_struc))
         fout.write('recalc = {}\n'.format(' '.join(str(x) for x in recalc)))
@@ -609,19 +690,48 @@ def writeout():
         fout.write('\n\n')
 
 
-def save_stat(stat):
+def save_stat(stat):    # only 1st run
     print('Save input data in cryspy.stat')
     # ---------- basic
     stat.set('input', 'algo', '{}'.format(algo))
     stat.set('input', 'calc_code', '{}'.format(calc_code))
     stat.set('input', 'tot_struc', '{}'.format(tot_struc))
-    stat.set('input', 'natot', '{}'.format(natot))
-    stat.set('input', 'atype', '{}'.format(' '.join(a for a in atype)))
-    stat.set('input', 'nat', '{}'.format(' '.join(str(b) for b in nat)))
     stat.set('input', 'nstage', '{}'.format(nstage))
     stat.set('input', 'njob', '{}'.format(njob))
     stat.set('input', 'jobcmd', '{}'.format(jobcmd))
     stat.set('input', 'jobfile', '{}'.format(jobfile))
+
+    # ---------- structure
+    stat.set('input', 'struc_mode', '{}'.format(struc_mode))
+    stat.set('input', 'natot', '{}'.format(natot))
+    stat.set('input', 'atype', '{}'.format(' '.join(a for a in atype)))
+    stat.set('input', 'nat', '{}'.format(' '.join(str(b) for b in nat)))
+    if mol_file is None:
+        stat.set('input', 'mol_file', '{}'.format(mol_file))
+    else:
+        stat.set('input', 'mol_file', '{}'.format(' '.join(a for a in mol_file)))
+    if nmol is None:
+        stat.set('input', 'nmol', '{}'.format(nmol))
+    else:
+        stat.set('input', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
+    stat.set('input', 'vol_mu', '{}'.format(vol_mu))
+    stat.set('input', 'vol_sigma', '{}'.format(vol_sigma))
+    stat.set('input', 'maxcnt', '{}'.format(maxcnt))
+    stat.set('input', 'symprec', '{}'.format(symprec))
+    if spgnum == 0 or spgnum == 'all':
+        stat.set('input', 'spgnum', '{}'.format(spgnum))
+    else:
+        stat.set('input', 'spgnum',
+                 '{}'.format(' '.join(str(d) for d in spgnum)))
+    stat.set('input', 'use_find_wy', '{}'.format(use_find_wy))
+    # -- spgnum == 0 or use_find_wy
+    if spgnum == 0 or use_find_wy:
+        stat.set('input', 'minlen', '{}'.format(minlen))
+        stat.set('input', 'maxlen', '{}'.format(maxlen))
+        stat.set('input', 'dangle', '{}'.format(dangle))
+        for i in range(len(atype)):
+            stat.set('input', 'mindist_{}'.format(i+1),
+                     '{}'.format(' '.join(str(c) for c in mindist[i])))
 
     # ---------- BO
     if algo == 'BO':
@@ -653,6 +763,9 @@ def save_stat(stat):
         stat.set('input', 'n_elite', '{}'.format(n_elite))
         stat.set('input', 'fit_reverse', '{}'.format(fit_reverse))
         stat.set('input', 'n_fittest', '{}'.format(n_fittest))
+        for i in range(len(atype)):
+            stat.set('input', 'mindist_ea_{}'.format(i+1),
+                     '{}'.format(' '.join(str(c) for c in mindist_ea[i])))
         stat.set('input', 'slct_func', '{}'.format(slct_func))
         if slct_func == 'TNM':
             stat.set('input', 't_size', '{}'.format(t_size))
@@ -665,14 +778,6 @@ def save_stat(stat):
         stat.set('input', 'sigma_st', '{}'.format(sigma_st))
         stat.set('input', 'maxcnt_ea', '{}'.format(maxcnt_ea))
         stat.set('input', 'maxgen_ea', '{}'.format(maxgen_ea))
-
-    # ---------- lattice
-    stat.set('input', 'minlen', '{}'.format(minlen))
-    stat.set('input', 'maxlen', '{}'.format(maxlen))
-    stat.set('input', 'dangle', '{}'.format(dangle))
-    for i in range(len(atype)):
-        stat.set('input', 'mindist_{}'.format(i+1),
-                 '{}'.format(' '.join(str(c) for c in mindist[i])))
 
     # ---------- VASP
     if calc_code == 'VASP':
@@ -687,7 +792,7 @@ def save_stat(stat):
         stat.set('input', 'kppvol',
                  '{}'.format(' '.join(str(c) for c in kppvol)))
         stat.set('input', 'force_gamma', '{}'.format(force_gamma))
-    
+
     # ---------- OMX
     if calc_code == 'OMX':
         stat.set('input', 'OMX_infile', '{}'.format(OMX_infile))
@@ -711,14 +816,7 @@ def save_stat(stat):
         stat.set('input', 'lammps_data', '{}'.format(lammps_data))
 
     # ---------- option
-    stat.set('input', 'maxcnt', '{}'.format(maxcnt))
     stat.set('input', 'stop_chkpt', '{}'.format(stop_chkpt))
-    stat.set('input', 'symprec', '{}'.format(symprec))
-    if spgnum == 0 or spgnum == 'all':
-        stat.set('input', 'spgnum', '{}'.format(spgnum))
-    else:
-        stat.set('input', 'spgnum',
-                 '{}'.format(' '.join(str(d) for d in spgnum)))
     stat.set('input', 'load_struc_flag', '{}'.format(load_struc_flag))
     stat.set('input', 'stop_next_struc', '{}'.format(stop_next_struc))
     stat.set('input', 'recalc', '{}'.format(' '.join(str(x) for x in recalc)))
@@ -739,15 +837,56 @@ def diffinstat(stat):
     old_algo = stat.get('input', 'algo')
     old_calc_code = stat.get('input', 'calc_code')
     old_tot_struc = stat.getint('input', 'tot_struc')
+    old_nstage = stat.getint('input', 'nstage')
+    old_njob = stat.getint('input', 'njob')
+    old_jobcmd = stat.get('input', 'jobcmd')
+    old_jobfile = stat.get('input', 'jobfile')
+
+    # ------ structure
+    old_struc_mode = stat.get('input', 'struc_mode')
     old_natot = stat.getint('input', 'natot')
     old_atype = stat.get('input', 'atype')
     old_atype = [a for a in old_atype.split()]    # list
     old_nat = stat.get('input', 'nat')
     old_nat = [int(x) for x in old_nat.split()]    # str --> int list
-    old_nstage = stat.getint('input', 'nstage')
-    old_njob = stat.getint('input', 'njob')
-    old_jobcmd = stat.get('input', 'jobcmd')
-    old_jobfile = stat.get('input', 'jobfile')
+    old_mol_file = stat.get('input', 'mol_file')
+    if old_mol_file == 'None':
+        old_mol_file = None    # character --> None
+    else:
+        old_mol_file = [a for a in old_mol_file.split()]    # list
+    old_nmol = stat.get('input', 'nmol')
+    if old_nmol == 'None':
+        old_nmol = None    # character --> None
+    else:
+        old_nmol = [int(x) for x in old_nmol.split()]    # str --> int list
+    old_vol_mu = stat.get('input', 'vol_mu')
+    if old_vol_mu == 'None':
+        old_vol_mu = None    # character --> None
+    else:
+        old_vol_mu = float(old_vol_mu)    # character --> float
+    old_vol_sigma = stat.get('input', 'vol_sigma')
+    if old_vol_sigma == 'None':
+        old_vol_sigma = None    # character --> None
+    else:
+        old_vol_sigma = float(old_vol_sigma)    # character --> float
+    old_maxcnt = stat.getint('input', 'maxcnt')
+    old_symprec = stat.getfloat('input', 'symprec')
+    old_spgnum = stat.get('input', 'spgnum')
+    if old_spgnum == '0':
+        old_spgnum = 0
+    elif not old_spgnum == 'all':
+        old_spgnum = [int(x) for x in old_spgnum.split()]    # int list
+    old_use_find_wy = stat.getboolean('input', 'use_find_wy')
+    # -- spgnum == 0 or use_find_wy
+    if old_spgnum == 0 or old_use_find_wy:
+        old_minlen = stat.getfloat('input', 'minlen')
+        old_maxlen = stat.getfloat('input', 'maxlen')
+        old_dangle = stat.getfloat('input', 'dangle')
+        old_mindist = []
+        for i in range(len(atype)):
+            tmp = stat.get('input', 'mindist_{}'.format(i+1))
+            tmp = [float(x) for x in tmp.split()]    # character --> float
+            old_mindist.append(tmp)
 
     # ------ BO
     if old_algo == 'BO':
@@ -779,6 +918,11 @@ def diffinstat(stat):
         old_n_elite = stat.getint('input', 'n_elite')
         old_fit_reverse = stat.getboolean('input', 'fit_reverse')
         old_n_fittest = stat.getint('input', 'n_fittest')
+        old_mindist_ea = []
+        for i in range(len(atype)):
+            tmp = stat.get('input', 'mindist_ea_{}'.format(i+1))
+            tmp = [float(x) for x in tmp.split()]    # character --> float
+            old_mindist_ea.append(tmp)
         old_slct_func = stat.get('input', 'slct_func')
         if old_slct_func == 'TNM':
             old_t_size = stat.getint('input', 't_size')
@@ -793,16 +937,6 @@ def diffinstat(stat):
         old_maxgen_ea = stat.getint('input', 'maxgen_ea')
         # old_restart_gen = stat.get('input', 'restart_gen')
 
-    # ------ lattice
-    old_minlen = stat.getfloat('input', 'minlen')
-    old_maxlen = stat.getfloat('input', 'maxlen')
-    old_dangle = stat.getfloat('input', 'dangle')
-    old_mindist = []
-    for i in range(len(atype)):
-        tmp = stat.get('input', 'mindist_{}'.format(i+1))
-        tmp = [float(x) for x in tmp.split()]    # character --> float
-        old_mindist.append(tmp)
-
     # ------ VASP
     if old_calc_code == 'VASP':
         old_kppvol = stat.get('input', 'kppvol')
@@ -816,7 +950,7 @@ def diffinstat(stat):
         old_kppvol = stat.get('input', 'kppvol')
         old_kppvol = [int(x) for x in old_kppvol.split()]  # int list
         old_force_gamma = stat.getboolean('input', 'force_gamma')
-    
+
     if old_calc_code == 'OMX':
         old_OMX_infile = stat.get('input', 'OMX_infile')
         old_OMX_outfile = stat.get('input', 'OMX_outfile')
@@ -841,14 +975,7 @@ def diffinstat(stat):
         old_lammps_data = stat.get('input', 'lammps_data')
 
     # ------ option
-    old_maxcnt = stat.getint('input', 'maxcnt')
     old_stop_chkpt = stat.getint('input', 'stop_chkpt')
-    old_symprec = stat.getfloat('input', 'symprec')
-    old_spgnum = stat.get('input', 'spgnum')
-    if old_spgnum == '0':
-        old_spgnum = 0
-    elif not old_spgnum == 'all':
-        old_spgnum = [int(x) for x in old_spgnum.split()]    # int list
     old_load_struc_flag = stat.getboolean('input', 'load_struc_flag')
     old_stop_next_struc = stat.getboolean('input', 'stop_next_struc')
     old_recalc = stat.get('input', 'recalc')
@@ -870,12 +997,6 @@ def diffinstat(stat):
         diff_out('tot_struc', old_tot_struc, tot_struc)
         io_stat.set_input_common(stat, 'tot_struc', tot_struc)
         logic_change = True
-    if not old_natot == natot:
-        raise ValueError('Do not change natot')
-    if not old_atype == atype:
-        raise ValueError('Do not change atype')
-    if not old_nat == nat:
-        raise ValueError('Do not change nat')
     if not old_nstage == nstage:
         diff_out('nstage', old_nstage, nstage)
         io_stat.set_input_common(stat, 'nstage', nstage)
@@ -891,6 +1012,99 @@ def diffinstat(stat):
     if not old_jobfile == jobfile:
         diff_out('jobfile', old_jobfile, jobfile)
         io_stat.set_input_common(stat, 'jobfile', jobfile)
+        logic_change = True
+
+    # ------ structure
+    if not old_struc_mode == struc_mode:
+        if old_struc_mode in ['crystal', 'mol'] and struc_mode in ['crystal', 'mol']:
+            diff_out('struc_mode', old_struc_mode, struc_mode)
+            io_stat.set_input_common(stat, 'struc_mode', struc_mode)
+            logic_change = True
+        else:
+            raise ValueError('Do not change struc_mode except for crystal <--> mol')
+    if not old_natot == natot:
+        raise ValueError('Do not change natot')
+    if not old_atype == atype:
+        raise ValueError('Do not change atype')
+    if not old_nat == nat:
+        raise ValueError('Do not change nat')
+    if not old_mol_file == mol_file:
+        diff_out('mol_file', old_mol_file, mol_file)
+        io_stat.set_input_common(stat, 'mol_file', mol_file)
+        logic_change = True
+    if not old_nmol == nmol:
+        if old_nmol is None or nmol is None:
+            diff_out('nmol', old_nmol, nmol)
+            io_stat.set_input_common(stat, 'nmol', nmol)
+            logic_change = True
+        else:
+            raise ValueError('Do not change nmol except for None')
+    if not old_vol_mu == vol_mu:
+        diff_out('vol_mu', old_vol_mu, vol_mu)
+        io_stat.set_input_common(stat, 'vol_mu', vol_mu)
+        logic_change = True
+    if not old_vol_sigma == vol_sigma:
+        diff_out('vol_sigma', old_vol_sigma, vol_sigma)
+        io_stat.set_input_common(stat, 'vol_sigma', vol_sigma)
+        logic_change = True
+    if not old_maxcnt == maxcnt:
+        diff_out('maxcnt', old_maxcnt, maxcnt)
+        io_stat.set_input_common(stat, 'maxcnt', maxcnt)
+        logic_change = True
+    if not old_symprec == symprec:
+        diff_out('symprec', old_symprec, symprec)
+        io_stat.set_input_common(stat, 'symprec', symprec)
+        logic_change = True
+    if not old_spgnum == spgnum:
+        diff_out('spgnum', old_spgnum, spgnum)
+        if spgnum == 0 or spgnum == 'all':
+            io_stat.set_input_common(stat, 'spgnum', spgnum)
+        else:
+            io_stat.set_input_common(stat, 'spgnum', '{}'.format(
+                ' '.join(str(x) for x in spgnum)))
+        logic_change = True
+    if not old_use_find_wy == use_find_wy:
+        diff_out('use_find_wy', old_use_find_wy, use_find_wy)
+        io_stat.set_input_common(stat, 'use_find_wy', use_find_wy)
+        logic_change = True
+    # -- spgnum == 0 or use_find_wy
+    if (spgnum == 0 or use_find_wy) and (old_spgnum == 0 or old_use_find_wy):
+        if not old_minlen == minlen:
+            diff_out('minlen', old_minlen, minlen)
+            io_stat.set_input_common(stat, 'minlen', minlen)
+            logic_change = True
+        if not old_maxlen == maxlen:
+            diff_out('maxlen', old_maxlen, maxlen)
+            io_stat.set_input_common(stat, 'maxlen', maxlen)
+            logic_change = True
+        if not old_dangle == dangle:
+            diff_out('dangle', old_dangle, dangle)
+            io_stat.set_input_common(stat, 'dangle', dangle)
+            logic_change = True
+        if not old_mindist == mindist:
+            diff_out('mindist', old_mindist, mindist)
+            for i in range(len(atype)):
+                io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
+                                         '{}'.format(' '.join(
+                                             str(x) for x in mindist[i])))
+            logic_change = True
+    elif (spgnum == 0 or use_find_wy) and (not (old_spgnum == 0 or old_use_find_wy)):
+        # -- write for the change: pyxtal --> find_wy
+        io_stat.set_input_common(stat, 'minlen', minlen)
+        io_stat.set_input_common(stat, 'maxlen', maxlen)
+        io_stat.set_input_common(stat, 'dangle', dangle)
+        for i in range(len(atype)):
+            io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
+                                     '{}'.format(' '.join(
+                                         str(x) for x in mindist[i])))
+        logic_change = True
+    elif (not (spgnum == 0 or use_find_wy)) and (old_spgnum == 0 or old_use_find_wy):
+        # -- clear
+        stat.remove_option('input', 'minlen')
+        stat.remove_option('input', 'maxlen')
+        stat.remove_option('input', 'dangle')
+        for i in range(len(atype)):
+            stat.remove_option('input', 'mindist_{}'.format(i+1))
         logic_change = True
 
     # ------ BO
@@ -976,6 +1190,13 @@ def diffinstat(stat):
             diff_out('n_fittest', old_n_fittest, n_fittest)
             io_stat.set_input_common(stat, 'n_fittest', n_fittest)
             logic_change = True
+        if not old_mindist_ea == mindist_ea:
+            diff_out('mindist_ea', old_mindist_ea, mindist_ea)
+            for i in range(len(atype)):
+                io_stat.set_input_common(stat, 'mindist_ea_{}'.format(i+1),
+                                         '{}'.format(' '.join(
+                                             str(x) for x in mindist_ea[i])))
+            logic_change = True
         if not old_slct_func == slct_func:
             diff_out('slct_func', old_slct_func, slct_func)
             io_stat.set_input_common(stat, 'slct_func', slct_func)
@@ -1018,29 +1239,6 @@ def diffinstat(stat):
             diff_out('maxgen_ea', old_maxgen_ea, maxgen_ea)
             io_stat.set_input_common(stat, 'maxgen_ea', maxgen_ea)
             logic_change = True
-
-    # ------ lattice
-    if not old_minlen == minlen:
-        diff_out('minlen', old_minlen, minlen)
-        io_stat.set_input_common(stat, 'minlen', minlen)
-        logic_change = True
-    if not old_maxlen == maxlen:
-        diff_out('maxlen', old_maxlen, maxlen)
-        io_stat.set_input_common(stat, 'maxlen', maxlen)
-        logic_change = True
-    if not old_dangle == dangle:
-        diff_out('dangle', old_dangle, dangle)
-        io_stat.set_input_common(stat, 'dangle', dangle)
-        logic_change = True
-    if not old_mindist == mindist:
-        diff_out('mindist', old_mindist, mindist)
-        io_stat.set_input_common(stat, 'mindist', mindist)
-
-        for i in range(len(atype)):
-            io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
-                                     '{}'.format(' '.join(
-                                         str(x) for x in mindist[i])))
-        logic_change = True
 
     # ------ VASP
     if calc_code == 'VASP':
@@ -1106,25 +1304,9 @@ def diffinstat(stat):
             raise ValueError('Do not change lammps_data')
 
     # ------ option
-    if not old_maxcnt == maxcnt:
-        diff_out('maxcnt', old_maxcnt, maxcnt)
-        io_stat.set_input_common(stat, 'maxcnt', maxcnt)
-        logic_change = True
     if not old_stop_chkpt == stop_chkpt:
         diff_out('stop_chkpt', old_stop_chkpt, stop_chkpt)
         io_stat.set_input_common(stat, 'stop_chkpt', stop_chkpt)
-        logic_change = True
-    if not old_symprec == symprec:
-        diff_out('symprec', old_symprec, symprec)
-        io_stat.set_input_common(stat, 'symprec', symprec)
-        logic_change = True
-    if not old_spgnum == spgnum:
-        diff_out('spgnum', old_spgnum, spgnum)
-        if spgnum == 0 or spgnum == 'all':
-            io_stat.set_input_common(stat, 'spgnum', spgnum)
-        else:
-            io_stat.set_input_common(stat, 'spgnum', '{}'.format(
-                ' '.join(str(x) for x in spgnum)))
         logic_change = True
     if not old_load_struc_flag == load_struc_flag:
         diff_out('load_struc_flag', old_load_struc_flag, load_struc_flag)

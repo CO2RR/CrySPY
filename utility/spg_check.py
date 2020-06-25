@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 import argparse
 
@@ -25,5 +24,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # ---------- main
-    filename = args.infile.split('/')[-1]    # ./aaa/bbb/POSCAR --> POSCAR
-    print get_spg_info(filename, args.tolerance)
+    print(get_spg_info(args.infile, args.tolerance))

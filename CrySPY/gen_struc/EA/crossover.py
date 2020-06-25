@@ -140,7 +140,7 @@ class Crossover:
         # ---------- final check for nat
         self._check_nat()
         if not all([n == 0 for n in self._nat_diff]):
-            raise ValueError('There is a bug: final check for nat')
+            return None    # failure
         # ---------- sort by atype
         self.child = sort_by_atype(self.child, self.atype)
         # ---------- return

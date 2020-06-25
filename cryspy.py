@@ -6,7 +6,7 @@ Main script
 import os
 
 from CrySPY.interface import select_code
-from CrySPY.job import ctrl_job
+from CrySPY.job.ctrl_job import Ctrl_job
 from CrySPY.IO import read_input as rin
 from CrySPY.start import cryspy_init, cryspy_restart
 
@@ -36,12 +36,11 @@ if rin.stop_chkpt == 1:
 # ---------- check calc files in ./calc_in
 select_code.check_calc_files()
 
-# os.makedirs('work/fin', exist_ok=True)    # python3.2 or later
-if not os.path.isdir('work/fin'):
-    os.makedirs('work/fin')
+# ---------- mkdir work/fin
+os.makedirs('work/fin', exist_ok=True)
 
 # ---------- instantiate Ctrl_job class
-jobs = ctrl_job.Ctrl_job(stat, init_struc_data)
+jobs = Ctrl_job(stat, init_struc_data)
 
 # ---------- check job status
 jobs.check_job()

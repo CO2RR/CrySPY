@@ -107,5 +107,8 @@ class Permutation:
             else:    # fail
                 cnt += 1
                 if cnt >= self.maxcnt_ea:
+                    print('Permutatin: could not satisfy min_dist' +
+                          ' in {} times'.format(self.maxcnt_ea))
+                    print('Change parent')
                     self.child = None
                     return None    # change parent

@@ -4,13 +4,8 @@ Generational change in evolutionary algorithm
 
 import pandas as pd
 
-from .. import utility
+from .ea_child import child_gen
 from ..gen_struc.EA.select_parents import Select_parents
-from ..gen_struc.EA.crossover import Crossover
-from ..gen_struc.EA.permutation import Permutation
-from ..gen_struc.EA.strain import Strain
-from ..gen_struc.EA.ea_generation import EA_generation
-from ..gen_struc.random.random_generation import Rnd_struc_gen
 from ..IO import out_results
 from ..IO import change_input, io_stat, pkl_data
 from ..IO import read_input as rin
@@ -45,51 +40,7 @@ def next_gen(stat, init_struc_data, opt_struc_data, rslt_data, ea_id_data):
 
     # ---------- generate offspring by EA
     print('# -- Generate structures')
-    eagen = EA_generation(sp=sp, symprec=rin.symprec, id_start=rin.tot_struc,
-                          init_pos_path='./data/init_POSCARS')
-    # ------ instantiate Crossover class
-    if rin.n_crsov > 0:
-        co = Crossover(rin.atype, rin.nat, rin.mindist,
-                       rin.crs_lat, rin.nat_diff_tole, rin.maxcnt_ea)
-        eagen.gen_crossover(rin.n_crsov, co=co)    # crossover
-        with open('cryspy.out', 'a') as fout:
-            fout.write('{} structures by crossover\n'.format(rin.n_crsov))
-    # ------ instantiate Permutation class
-    if rin.n_perm > 0:
-        pm = Permutation(rin.atype, rin.mindist, rin.ntimes, rin.maxcnt_ea)
-        eagen.gen_permutation(rin.n_perm, pm=pm)    # permutation
-        with open('cryspy.out', 'a') as fout:
-            fout.write('{} structures by permutation\n'.format(rin.n_perm))
-    # ------ instantiate Strain class
-    if rin.n_strain > 0:
-        st = Strain(rin.atype, rin.mindist, rin.sigma_st, rin.maxcnt_ea)
-        eagen.gen_strain(rin.n_strain, st=st)    # strain
-        with open('cryspy.out', 'a') as fout:
-            fout.write('{} structures by strain\n'.format(rin.n_strain))
-    # ------ update init_struc_data
-    init_struc_data.update(eagen.offspring)
-
-    # ---------- random generation
-    if rin.n_rand > 0:
-        rsg = Rnd_struc_gen(rin.natot, rin.atype, rin.nat,
-                            rin.minlen, rin.maxlen, rin.dangle,
-                            rin.mindist, rin.maxcnt, rin.symprec)
-        if rin.spgnum == 0:
-            rsg.gen_wo_spg(rin.n_rand, id_offset=eagen.cid,
-                           init_pos_path='./data/init_POSCARS')
-            init_struc_data.update(rsg.init_struc_data)
-        else:
-            fwpath = utility.check_fwpath()
-            rsg.gen_with_spg(rin.n_rand, rin.spgnum,
-                             id_offset=eagen.cid,
-                             init_pos_path='./data/init_POSCARS',
-                             fwpath=fwpath)
-            init_struc_data.update(rsg.init_struc_data)
-    with open('cryspy.out', 'a') as fout:
-        fout.write('{} structures by random\n'.format(rin.n_rand))
-
-    # ---------- save init_struc_data
-    pkl_data.save_init_struc(init_struc_data)
+    _, eagen = child_gen(sp, init_struc_data)
 
     # ---------- select elite
     if rin.n_elite > 0:

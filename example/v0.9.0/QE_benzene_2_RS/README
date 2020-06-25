@@ -1,0 +1,3 @@
+you do not have to prepare the molecular structure file of benzene.
+This will load from PyXtal's database.
+See, https://pyxtal.readthedocs.io/en/latest/Others.html

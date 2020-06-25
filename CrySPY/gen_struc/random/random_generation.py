@@ -39,14 +39,25 @@ class Rnd_struc_gen:
             Si -  O: 1.2
              O -  O: 1.5
 
+    vol_mu (int or float or None): default --> None
+                                   average volume in Gaussian distribution
+                                   when you scale cell volume
+
+    vol_sigma (int or float or None): default --> None
+                                      standard deviation in Gaussian distribution
+                                      when you scale cell volume
+
+    symprec (float): default --> 0.01
+                     tolerance for symmetry finding
+
     # ---------- instance methods
     self.gen_wo_spg(self, nstruc)
 
-    self.gen_with_spg(self, nstruc, spgnum='all')
+    self.gen_with_find_wy(self, nstruc, spgnum='all')
     '''
 
     def __init__(self, natot, atype, nat, minlen, maxlen, dangle, mindist,
-                 maxcnt=50, symprec=0.001):
+                 vol_mu=None, vol_sigma=None, maxcnt=50, symprec=0.01):
         # ---------- check args
         # ------ int
         for i in [natot, maxcnt]:
@@ -54,8 +65,6 @@ class Rnd_struc_gen:
                 pass
             else:
                 raise ValueError('natot and maxcnt must be positive int')
-        self.natot = natot
-        self.maxcnt = maxcnt
         # ------ list
         for x in [atype, nat, mindist]:
             if type(x) is not list:
@@ -70,9 +79,13 @@ class Rnd_struc_gen:
                                      '({}, {}): {}, ({}, {}): {}'.format(
                                          i, j, mindist[i][j],
                                          j, i, mindist[j][i]))
-        self.atype = atype
-        self.nat = nat
-        self.mindist = mindist
+        # ------ vol_mu, vol_sigma
+        if vol_mu is not None:
+            for x in [vol_mu, vol_sigma]:
+                if type(x) is not float and type(x) is not int:
+                    raise ValueError('vol_mu and vol_sigma must be int or float')
+            if vol_mu <= 0:
+                raise ValueError('vol_mu must be positive')
         # ------ float
         for x in [minlen, maxlen, dangle, symprec]:
             if minlen > maxlen:
@@ -84,6 +97,14 @@ class Rnd_struc_gen:
             else:
                 raise ValueError('minlen, maxlen, dangle, and symprec'
                                  ' must be positive float')
+        # ------ self.xxx = xxx
+        self.natot = natot
+        self.maxcnt = maxcnt
+        self.atype = atype
+        self.nat = nat
+        self.mindist = mindist
+        self.vol_mu = vol_mu
+        self.vol_sigma = vol_sigma
         self.minlen = minlen
         self.maxlen = maxlen
         self.dangle = dangle
@@ -131,6 +152,10 @@ class Rnd_struc_gen:
             # ------ get structure
             tmp_struc = self._gen_struc_wo_spg()
             if tmp_struc is not None:    # success of generation
+                # ------ scale volume
+                if self.vol_mu is not None:
+                    vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
+                    tmp_struc.scale_lattice(volume=vol)
                 # ------ check actual space group using pymatgen
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -148,8 +173,8 @@ class Rnd_struc_gen:
                     out_poscar(tmp_struc, cid, init_pos_path)
         self.init_struc_data = init_struc_data
 
-    def gen_with_spg(self, nstruc, spgnum='all', id_offset=0,
-                     init_pos_path=None, fwpath='./find_wy'):
+    def gen_with_find_wy(self, nstruc, spgnum='all', id_offset=0,
+                         init_pos_path=None, fwpath='./find_wy'):
         '''
         Generate random structures with space gruop information
         using find_wy program
@@ -229,6 +254,10 @@ class Rnd_struc_gen:
                 # -- maximum trial or no POS_WY_SKEL_ALL.json file
                 self._rm_files()    # clean
                 continue      # to new fw_input
+            # ------ scale volume
+            if self.vol_mu is not None:
+                vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
+                tmp_struc.scale_lattice(volume=vol)
             # ------ check actual space group using pymatgen
             try:
                 spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -268,12 +297,12 @@ class Rnd_struc_gen:
         # ---------- for spgnum = 0: no space group
         if spgnum == 0:
             crystal_systems = ['Triclinic',
-                              'Monoclinic',
-                              'Orthorhombic',
-                              'Tetragonal',
-                              'Rhombohedral',
-                              'Hexagonal',
-                              'Cubic']
+                               'Monoclinic',
+                               'Orthorhombic',
+                               'Tetragonal',
+                               'Rhombohedral',
+                               'Hexagonal',
+                               'Cubic']
             spg = 0
             csys = random.choice(crystal_systems)
         # ---------- for spgnum 1--230

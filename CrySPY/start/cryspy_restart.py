@@ -8,6 +8,7 @@ from .. import utility
 from ..BO import bo_restart
 from ..EA import ea_append
 from ..gen_struc.random.random_generation import Rnd_struc_gen
+from ..gen_struc.random.gen_pyxtal import Rnd_struc_gen_pyxtal
 from ..IO import io_stat, pkl_data
 from ..IO import read_input as rin
 from ..LAQA import laqa_restart
@@ -75,18 +76,44 @@ def append_struc(init_struc_data):
         fout.write('\n# ---------- Append structures\n')
     id_offset = len(init_struc_data)
     nstruc = rin.tot_struc - id_offset
-    rsg = Rnd_struc_gen(rin.natot, rin.atype, rin.nat,
-                        rin.minlen, rin.maxlen, rin.dangle,
-                        rin.mindist, rin.maxcnt, rin.symprec)
-    if rin.spgnum == 0:
-        rsg.gen_wo_spg(nstruc, id_offset, init_pos_path='./data/init_POSCARS')
-        init_struc_data.update(rsg.init_struc_data)
-    else:
-        fwpath = utility.check_fwpath()
-        rsg.gen_with_spg(nstruc, rin.spgnum, id_offset,
-                         init_pos_path='./data/init_POSCARS', fwpath=fwpath)
-        init_struc_data.update(rsg.init_struc_data)
 
+    # ---------- pyxtal
+    if not (rin.spgnum == 0 or rin.use_find_wy):
+        rsgx = Rnd_struc_gen_pyxtal(natot=rin.natot, atype=rin.atype,
+                                    nat=rin.nat, vol_mu=rin.vol_mu,
+                                    vol_sigma=rin.vol_sigma,
+                                    spgnum=rin.spgnum, symprec=rin.symprec)
+        # ------ crystal
+        if rin.struc_mode == 'crystal':
+            rsgx.gen_struc(nstruc=nstruc, id_offset=id_offset,
+                           init_pos_path='./data/init_POSCARS')
+        # ------ molecular crystal
+        elif rin.struc_mode == 'mol':
+            rsgx.set_mol(mol_file=rin.mol_file, nmol=rin.nmol)
+            rsgx.gen_struc_mol(nstruc=nstruc, id_offset=id_offset,
+                               init_pos_path='./data/init_POSCARS')
+        # ------ update
+        init_struc_data.update(rsgx.init_struc_data)
+    # ---------- Rnd_struc_gen
+    else:
+        rsg = Rnd_struc_gen(natot=rin.natot, atype=rin.atype, nat=rin.nat,
+                            minlen=rin.minlen, maxlen=rin.maxlen,
+                            dangle=rin.dangle, mindist=rin.mindist,
+                            vol_mu=rin.vol_mu, vol_sigma=rin.vol_sigma,
+                            maxcnt=rin.maxcnt, symprec=rin.symprec)
+        if rin.spgnum == 0:
+            rsg.gen_wo_spg(nstruc=nstruc, id_offset=id_offset,
+                           init_pos_path='./data/init_POSCARS')
+            init_struc_data.update(rsg.init_struc_data)
+        else:
+            fwpath = utility.check_fwpath()
+            rsg.gen_with_find_wy(nstruc=nstruc, spgnum=rin.spgnum,
+                                 id_offset=id_offset,
+                                 init_pos_path='./data/init_POSCARS',
+                                 fwpath=fwpath)
+            init_struc_data.update(rsg.init_struc_data)
+
+    # ---------- output
     print('')    # for blank line
     with open('cryspy.out', 'a') as fout:
         fout.write('Generated structures up to ID {}\n\n'.format(
