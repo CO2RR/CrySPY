@@ -24,13 +24,8 @@ class Rnd_struc_gen_pyxtal:
 
     nat (list): number of atom, e.g. [4, 8] for Si4O8
 
-    vol_mu (int or float or None): default --> None
-                                   average volume in Gaussian distribution
-                                   when you scale cell volume
-
-    vol_sigma (int or float or None): default --> None
-                                      standard deviation in Gaussian distribution
-                                      when you scale cell volume
+    vol_factor (int or float): default --> 1.0
+                        volume factor
 
     spgnum ('all' or list): space group numbers which you use
                             'all' --> 1--230
@@ -40,7 +35,7 @@ class Rnd_struc_gen_pyxtal:
                      tolerance for symmetry finding
     '''
 
-    def __init__(self, natot, atype, nat, vol_mu=None, vol_sigma=None,
+    def __init__(self, natot, atype, nat, vol_factor=1.0,
                  spgnum='all', symprec=0.01):
         # ---------- check args
         # ------ int
@@ -55,13 +50,11 @@ class Rnd_struc_gen_pyxtal:
                 raise ValueError('atype and nat must be list')
         if not len(atype) == len(nat):
             raise ValueError('not len(atype) == len(nat)')
-        # ------ vol_mu, vol_sigma
-        if vol_mu is not None:
-            for x in [vol_mu, vol_sigma]:
-                if type(x) is not float and type(x) is not int:
-                    raise ValueError('vol_mu and vol_sigma must be int or float')
-            if vol_mu <= 0:
-                raise ValueError('vol_mu must be positive')
+        # ------ vol_factor
+        if type(vol_factor) is not float and type(vol_factor) is not int:
+            raise ValueError('vol_factor must be int or float')
+        if vol_factor <= 0:
+            raise ValueError('vol_factor must be positive')
         # ------ spgnum
         if spgnum == 'all' or type(spgnum) is list:
             pass
@@ -71,8 +64,7 @@ class Rnd_struc_gen_pyxtal:
         self.natot = natot
         self.atype = atype
         self.nat = nat
-        self.vol_mu = vol_mu
-        self.vol_sigma = vol_sigma
+        self.vol_factor = vol_factor
         self.spgnum = spgnum
         self.symprec = symprec
         # ------ error list for spg number
@@ -162,7 +154,7 @@ class Rnd_struc_gen_pyxtal:
             # ------ generate structure
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')    # for incompatible
-                tmp_crystal = random_crystal(spg, self.atype, self.nat, 1.0)
+                tmp_crystal = random_crystal(spg, self.atype, self.nat, self.vol_factor)
             if tmp_crystal.valid:
                 tmp_struc = tmp_crystal.struct    # pymatgen Structure format
                 # -- check nat
@@ -174,10 +166,6 @@ class Rnd_struc_gen_pyxtal:
                         raise ValueError('number of atoms is wrong')
                 # -- sort, just in case
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
-                # -- scale volume
-                if self.vol_mu is not None:
-                    vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
-                    tmp_struc.scale_lattice(volume=vol)
                 # -- check actual space group
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -241,7 +229,7 @@ class Rnd_struc_gen_pyxtal:
             # ------ generate structure
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')    # for incompatible
-                tmp_crystal = molecular_crystal(spg, self.mol_file, self.nmol, 1.0)
+                tmp_crystal = molecular_crystal(spg, self.mol_file, self.nmol, self.vol_factor)
             if tmp_crystal.valid:
                 tmp_struc = tmp_crystal.struct    # pymatgen Structure format
                 # -- check nat
@@ -253,10 +241,6 @@ class Rnd_struc_gen_pyxtal:
                         raise ValueError('number of atoms is wrong')
                 # -- sort, necessary in molecular crystal
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
-                # -- scale volume
-                if self.vol_mu is not None:
-                    vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
-                    tmp_struc.scale_lattice(volume=vol)
                 # -- check actual space group
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
