@@ -3,6 +3,9 @@ Random structure generation using PyXtal
     https://github.com/qzhu2017/PyXtal
 '''
 
+from contextlib import redirect_stdout
+from multiprocessing import Process, Queue
+import os
 import random
 import warnings
 
@@ -185,7 +188,7 @@ class Rnd_struc_gen_pyxtal:
             else:
                 self.spg_error.append(spg)
 
-    def gen_struc_mol(self, nstruc, id_offset=0, init_pos_path=None):
+    def gen_struc_mol(self, nstruc, id_offset=0, init_pos_path=None, timeout_mol=20):
         '''
         Generate random molecular crystal structures for given space groups
         one have to run self.set_mol() in advance
@@ -202,6 +205,8 @@ class Rnd_struc_gen_pyxtal:
                              if you write POSCAR data of init_struc_data
                              ATTENSION: data are appended to the specified file
 
+        timeout_mol (int or float): timeout for one molecular structure generation
+
         # ---------- comment
         generated structure data are saved in self.init_struc_data
         '''
@@ -215,6 +220,10 @@ class Rnd_struc_gen_pyxtal:
         else:
             raise ValueError('init_pos_path is wrong.'
                              ' init_pos_path = {}'.format(init_pos_path))
+        if type(timeout_mol) is not float and type(timeout_mol) is not int:
+            raise ValueError('timeout_mol must be int or float')
+        if timeout_mol <= 0:
+            raise ValueError('timeout_mol must be positive')
         # ---------- initialize
         self.init_struc_data = {}
         # ---------- loop for structure generattion
@@ -227,14 +236,26 @@ class Rnd_struc_gen_pyxtal:
             if spg in self.spg_error:
                 continue
             # ------ generate structure
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')    # for incompatible
-                tmp_crystal = molecular_crystal(spg, self.mol_file, self.nmol, self.vol_factor)
-            if tmp_crystal.valid:
-                tmp_struc = tmp_crystal.struct    # pymatgen Structure format
+            # -- multiprocess for measures against hangup
+            q = Queue()
+            p = Process(target=self._mp_mc, args=(spg, q))
+            p.start()
+            p.join(timeout=timeout_mol)
+            if p.is_alive():
+                p.terminate()
+                p.join()
+            p.close()
+            if q.empty():
+                print('timeout for molecular structure generation. retry.')
+                continue
+            else:
+                tmp_struc = q.get()
+                tmp_valid = q.get()
+            if tmp_valid:
                 # -- check nat
                 if not self._check_nat(tmp_struc):
-                    # pyxtal returns conventional cell, too many atoms if centering
+                    # pyxtal returns conventional cell,
+                    # too many atoms if centering
                     tmp_struc = tmp_struc.get_primitive_structure()
                     # recheck nat
                     if not self._check_nat(tmp_struc):    # failure
@@ -267,3 +288,13 @@ class Rnd_struc_gen_pyxtal:
             if species_list.count(self.atype[i]) != self.nat[i]:
                 return False    # failure
         return True
+
+    def _mp_mc(self, spg, q):
+        '''multiprocess part'''
+        # ---------- temporarily stdout --> devnull
+        with redirect_stdout(open(os.devnull, 'w')):
+            tmp_crystal = molecular_crystal(spg, self.mol_file,
+                                            self.nmol, self.vol_factor)
+        # ---------- queue
+        q.put(tmp_crystal.struct)
+        q.put(tmp_crystal.valid)

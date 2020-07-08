@@ -47,7 +47,7 @@ def readin():
 
     # ---------- structure
     # ------ global declaration
-    global struc_mode, natot, atype, nat, mol_file, nmol
+    global struc_mode, natot, atype, nat, mol_file, nmol, timeout_mol
     global vol_factor, maxcnt, symprec, spgnum, use_find_wy
     # ------ read intput variables
     try:
@@ -75,9 +75,16 @@ def readin():
         nmol = [int(x) for x in nmol.split()]    # character --> integer
         if not len(mol_file) == len(nmol):
             raise ValueError('not len(mol_file) == len(nmol)')
+        try:
+            timeout_mol = config.getfloat('structure', 'timeout_mol')
+        except (configparser.NoOptionError, configparser.NoSectionError):
+            timeout_mol = 20.0
+        if timeout_mol <= 0:
+            raise ValueError('timeout_mol must be positive')
     else:
         mol_file = None
         nmol = None
+        timeout_mol = 20.0
     # --
     try:
         vol_factor = config.getfloat('structure', 'vol_factor')
@@ -573,6 +580,7 @@ def writeout():
             fout.write('nmol = {}\n'.format(nmol))
         else:
             fout.write('nmol = {}\n'.format(' '.join(str(b) for b in nmol)))
+        fout.write('timeout_mol = {}\n'.format(timeout_mol))
         fout.write('vol_factor = {}\n'.format(vol_factor))
         fout.write('maxcnt = {}\n'.format(maxcnt))
         fout.write('symprec = {}\n'.format(symprec))
@@ -721,6 +729,7 @@ def save_stat(stat):    # only 1st run
         stat.set('input', 'nmol', '{}'.format(nmol))
     else:
         stat.set('input', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
+    stat.set('input', 'timeout_mol', '{}'.format(timeout_mol))
     stat.set('input', 'vol_factor', '{}'.format(vol_factor))
     stat.set('input', 'maxcnt', '{}'.format(maxcnt))
     stat.set('input', 'symprec', '{}'.format(symprec))
@@ -867,6 +876,7 @@ def diffinstat(stat):
         old_nmol = None    # character --> None
     else:
         old_nmol = [int(x) for x in old_nmol.split()]    # str --> int list
+    old_timeout_mol = stat.getfloat('input', 'timeout_mol')
     old_vol_factor = stat.getfloat('input', 'vol_factor')
     old_maxcnt = stat.getint('input', 'maxcnt')
     old_symprec = stat.getfloat('input', 'symprec')
@@ -1048,6 +1058,10 @@ def diffinstat(stat):
             logic_change = True
         else:
             raise ValueError('Do not change nmol except for None')
+    if not old_timeout_mol == timeout_mol:
+        diff_out('timeout_mol', old_timeout_mol, timeout_mol)
+        io_stat.set_input_common(stat, 'timeout_mol', timeout_mol)
+        logic_change = True
     if not old_vol_factor == vol_factor:
         diff_out('vol_factor', old_vol_factor, vol_factor)
         io_stat.set_input_common(stat, 'vol_factor', vol_factor)

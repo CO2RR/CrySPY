@@ -54,7 +54,8 @@ def child_gen(sp, init_struc_data):
             elif rin.struc_mode == 'mol':
                 rsgx.set_mol(mol_file=rin.mol_file, nmol=rin.nmol)
                 rsgx.gen_struc_mol(nstruc=rin.n_rand, id_offset=eagen.cid,
-                                   init_pos_path='./data/init_POSCARS')
+                                   init_pos_path='./data/init_POSCARS',
+                                   timeout_mol=rin.timeout_mol)
             # -- update
             init_struc_data.update(rsgx.init_struc_data)
         # ------ Rnd_struc_gen

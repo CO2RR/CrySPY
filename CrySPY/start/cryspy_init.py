@@ -58,7 +58,8 @@ def initialize():
             elif rin.struc_mode == 'mol':
                 rsgx.set_mol(mol_file=rin.mol_file, nmol=rin.nmol)
                 rsgx.gen_struc_mol(nstruc=rin.tot_struc, id_offset=0,
-                                   init_pos_path='./data/init_POSCARS')
+                                   init_pos_path='./data/init_POSCARS',
+                                   timeout_mol=rin.timeout_mol)
             # ------ init_struc_data
             init_struc_data = rsgx.init_struc_data
         # ------ Rnd_struc_gen
