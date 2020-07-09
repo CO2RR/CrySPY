@@ -7,7 +7,6 @@ from contextlib import redirect_stdout
 from multiprocessing import Process, Queue
 import os
 import random
-import warnings
 
 from pyxtal.crystal import random_crystal
 from pyxtal.molecular_crystal import molecular_crystal
@@ -155,9 +154,8 @@ class Rnd_struc_gen_pyxtal:
             if spg in self.spg_error:
                 continue
             # ------ generate structure
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')    # for incompatible
-                tmp_crystal = random_crystal(spg, self.atype, self.nat, self.vol_factor)
+            tmp_crystal = random_crystal(spg, self.atype,
+                                         self.nat, self.vol_factor)
             if tmp_crystal.valid:
                 tmp_struc = tmp_crystal.struct    # pymatgen Structure format
                 # -- check nat
@@ -166,7 +164,7 @@ class Rnd_struc_gen_pyxtal:
                     tmp_struc = tmp_struc.get_primitive_structure()
                     # recheck nat
                     if not self._check_nat(tmp_struc):    # failure
-                        raise ValueError('number of atoms is wrong')
+                        continue
                 # -- sort, just in case
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
                 # -- check actual space group
@@ -259,7 +257,7 @@ class Rnd_struc_gen_pyxtal:
                     tmp_struc = tmp_struc.get_primitive_structure()
                     # recheck nat
                     if not self._check_nat(tmp_struc):    # failure
-                        raise ValueError('number of atoms is wrong')
+                        continue
                 # -- sort, necessary in molecular crystal
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
                 # -- check actual space group
