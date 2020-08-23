@@ -78,13 +78,13 @@ def readin():
         try:
             timeout_mol = config.getfloat('structure', 'timeout_mol')
         except (configparser.NoOptionError, configparser.NoSectionError):
-            timeout_mol = 20.0
+            timeout_mol = 60.0
         if timeout_mol <= 0:
             raise ValueError('timeout_mol must be positive')
     else:
         mol_file = None
         nmol = None
-        timeout_mol = 20.0
+        timeout_mol = 60.0
     # --
     try:
         vol_factor = config.getfloat('structure', 'vol_factor')

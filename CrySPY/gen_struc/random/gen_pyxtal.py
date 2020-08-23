@@ -7,6 +7,7 @@ from contextlib import redirect_stdout
 from multiprocessing import Process, Queue
 import os
 import random
+import sys
 
 from pyxtal.crystal import random_crystal
 from pyxtal.molecular_crystal import molecular_crystal
@@ -157,7 +158,8 @@ class Rnd_struc_gen_pyxtal:
             tmp_crystal = random_crystal(spg, self.atype,
                                          self.nat, self.vol_factor)
             if tmp_crystal.valid:
-                tmp_struc = tmp_crystal.struct    # pymatgen Structure format
+                #tmp_struc = tmp_crystal.struct    # pymatgen Structure format, old pyxtal
+                tmp_struc = tmp_crystal.to_pymatgen()    # pymatgen Structure format
                 # -- check nat
                 if not self._check_nat(tmp_struc):
                     # pyxtal returns conventional cell, that is, too many atoms
@@ -242,7 +244,9 @@ class Rnd_struc_gen_pyxtal:
             if p.is_alive():
                 p.terminate()
                 p.join()
-            p.close()
+            if sys.version_info.minor >= 7:
+                # Process.close() available from python 3.7
+                p.close()
             if q.empty():
                 print('timeout for molecular structure generation. retry.')
                 continue
@@ -294,5 +298,6 @@ class Rnd_struc_gen_pyxtal:
             tmp_crystal = molecular_crystal(spg, self.mol_file,
                                             self.nmol, self.vol_factor)
         # ---------- queue
-        q.put(tmp_crystal.struct)
+        #q.put(tmp_crystal.struct)    # old pyxtal
+        q.put(tmp_crystal.to_pymatgen())
         q.put(tmp_crystal.valid)
