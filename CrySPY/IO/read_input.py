@@ -48,7 +48,10 @@ def readin():
     # ---------- structure
     # ------ global declaration
     global struc_mode, natot, atype, nat, mol_file, nmol, timeout_mol
-    global vol_factor, maxcnt, symprec, spgnum, use_find_wy
+    global vol_factor, vol_mu, vol_sigma
+    global maxcnt, symprec, spgnum, use_find_wy, check_mindist
+    global mindist, minlen, maxlen, dangle
+
     # ------ read intput variables
     try:
         struc_mode = config.get('structure', 'struc_mode')
@@ -78,20 +81,46 @@ def readin():
         try:
             timeout_mol = config.getfloat('structure', 'timeout_mol')
         except (configparser.NoOptionError, configparser.NoSectionError):
-            timeout_mol = 60.0
+            timeout_mol = 180.0
         if timeout_mol <= 0:
             raise ValueError('timeout_mol must be positive')
     else:
         mol_file = None
         nmol = None
         timeout_mol = 60.0
-    # --
+    # -- volume
     try:
-        vol_factor = config.getfloat('structure', 'vol_factor')
+        vol_mu = config.getfloat('structure', 'vol_mu')
     except (configparser.NoOptionError, configparser.NoSectionError):
-        vol_factor = 1.0
-    if vol_factor <= 0.0:
-        raise ValueError('vol_factor must be positive float')
+        vol_mu = None
+    if vol_mu is not None:
+        if vol_mu <= 0.0:
+            raise ValueError('vol_mu must be positive float')
+    try:
+        vol_sigma = config.getfloat('structure', 'vol_sigma')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        vol_sigma = None
+    if vol_mu is not None:
+        if vol_sigma is None:
+            raise ValueError("check vol_mu: {} and vol_sigma: {}".format(
+                vol_mu, vol_sigma))
+    if vol_sigma is not None:
+        if vol_sigma <= 0.0:
+            raise ValueError('vol_mu must be positive float')
+    try:
+        vol_factor = config.get('structure', 'vol_factor')
+        vol_factor = [float(x) for x in vol_factor.split()]    # char --> float
+        if vol_factor[0] <= 0.0:
+            raise ValueError('vol_factor must be positive')
+        if len(vol_factor) == 1:
+            vol_factor = vol_factor * 2    # [0.8] --> [0.8, 0.8]
+        if len(vol_factor) == 2:
+            if vol_factor[0] > vol_factor[1]:
+                raise ValueError('check: vol_factor[0] < vol_factor[1]')
+        else:
+            raise ValueError('len(vol_factor) must be 1 or 2')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        vol_factor = [1.0, 1.0]
     try:
         maxcnt = config.getint('structure', 'maxcnt')
     except (configparser.NoOptionError, configparser.NoSectionError):
@@ -117,26 +146,19 @@ def readin():
     else:
         spgnum = spglist(spgnum)
     try:
+        check_mindist = config.getboolean('structure', 'check_mindist')
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        check_mindist = False
+    try:
         use_find_wy = config.getboolean('structure', 'use_find_wy')
     except (configparser.NoOptionError, configparser.NoSectionError):
         use_find_wy = False
     if use_find_wy:
         if not struc_mode == 'crystal':
             raise ValueError('find_wy can be use if struc_mode is crystal')
-    # ------ spgnum == 0 or use_find_wy
-    if spgnum == 0 or use_find_wy:
-        # -- global declaration
-        global minlen, maxlen, dangle, mindist, vol_mu, vol_sigma
-        # -- read input variables
-        minlen = config.getfloat('structure', 'minlen')
-        maxlen = config.getfloat('structure', 'maxlen')
-        dangle = config.getfloat('structure', 'dangle')
-        if minlen <= 0.0:
-            raise ValueError('minlen must be positive')
-        if minlen > maxlen:
-            raise ValueError('minlen > maxlen')
-        if dangle <= 0.0:
-            raise ValueError('dangle < 0.0, dangle must be positive')
+    # ------ mindist
+    mindist = None
+    if spgnum == 0 or check_mindist or use_find_wy:
         mindist = []
         for i in range(len(atype)):
             tmp = config.get('structure', 'mindist_{}'.format(i+1))
@@ -153,17 +175,21 @@ def readin():
                                          ' {}, ({}, {}) --> {}'.format(
                                              i, j, mindist[i][j],
                                              j, i, mindist[j][i]))
-        try:
-            vol_mu = config.getfloat('structure', 'vol_mu')
-        except (configparser.NoOptionError, configparser.NoSectionError):
-            vol_mu = None
-        if vol_mu is not None:
-            if vol_mu <= 0.0:
-                raise ValueError('vol_mu must be positive float')
-        try:
-            vol_sigma = config.getfloat('structure', 'vol_sigma')
-        except (configparser.NoOptionError, configparser.NoSectionError):
-            vol_sigma = None
+    # ------ spgnum == 0 or use_find_wy
+    minlen = None
+    maxlen = None
+    dangle = None
+    if spgnum == 0 or use_find_wy:
+        # -- read input variables
+        minlen = config.getfloat('structure', 'minlen')
+        maxlen = config.getfloat('structure', 'maxlen')
+        dangle = config.getfloat('structure', 'dangle')
+        if minlen <= 0.0:
+            raise ValueError('minlen must be positive')
+        if minlen > maxlen:
+            raise ValueError('minlen > maxlen')
+        if dangle <= 0.0:
+            raise ValueError('dangle < 0.0, dangle must be positive')
 
     # ---------- option
     # ------ global declaration
@@ -581,7 +607,9 @@ def writeout():
         else:
             fout.write('nmol = {}\n'.format(' '.join(str(b) for b in nmol)))
         fout.write('timeout_mol = {}\n'.format(timeout_mol))
-        fout.write('vol_factor = {}\n'.format(vol_factor))
+        fout.write('vol_factor = {}\n'.format(' '.join(str(b) for b in vol_factor)))
+        fout.write('vol_mu = {}\n'.format(vol_mu))
+        fout.write('vol_sigma = {}\n'.format(vol_sigma))
         fout.write('maxcnt = {}\n'.format(maxcnt))
         fout.write('symprec = {}\n'.format(symprec))
         if spgnum == 0 or spgnum == 'all':
@@ -589,17 +617,17 @@ def writeout():
         else:
             fout.write('spgnum = {}\n'.format(
                 ' '.join(str(d) for d in spgnum)))
+        fout.write('check_mindist = {}\n'.format(check_mindist))
         fout.write('use_find_wy = {}\n'.format(use_find_wy))
-        # -- spgnum == 0 or use_find_wy
-        if spgnum == 0 or use_find_wy:
-            fout.write('minlen = {}\n'.format(minlen))
-            fout.write('maxlen = {}\n'.format(maxlen))
-            fout.write('dangle = {}\n'.format(dangle))
+        if mindist is None:
+            fout.write('mindist = {}\n'.format(mindist))
+        else:
             for i in range(len(atype)):
                 fout.write('mindist_{0} = {1}\n'.format(
                     i+1, ' '.join(str(c) for c in mindist[i])))
-            fout.write('vol_mu = {}\n'.format(vol_mu))
-            fout.write('vol_sigma = {}\n'.format(vol_sigma))
+        fout.write('minlen = {}\n'.format(minlen))
+        fout.write('maxlen = {}\n'.format(maxlen))
+        fout.write('dangle = {}\n'.format(dangle))
 
         # ------ BO
         if algo == 'BO':
@@ -730,7 +758,9 @@ def save_stat(stat):    # only 1st run
     else:
         stat.set('input', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
     stat.set('input', 'timeout_mol', '{}'.format(timeout_mol))
-    stat.set('input', 'vol_factor', '{}'.format(vol_factor))
+    stat.set('input', 'vol_factor', '{}'.format(' '.join(str(b) for b in vol_factor)))
+    stat.set('input', 'vol_mu', '{}'.format(vol_mu))
+    stat.set('input', 'vol_sigma', '{}'.format(vol_sigma))
     stat.set('input', 'maxcnt', '{}'.format(maxcnt))
     stat.set('input', 'symprec', '{}'.format(symprec))
     if spgnum == 0 or spgnum == 'all':
@@ -738,17 +768,17 @@ def save_stat(stat):    # only 1st run
     else:
         stat.set('input', 'spgnum',
                  '{}'.format(' '.join(str(d) for d in spgnum)))
+    stat.set('input', 'check_mindist', '{}'.format(check_mindist))
     stat.set('input', 'use_find_wy', '{}'.format(use_find_wy))
-    # -- spgnum == 0 or use_find_wy
-    if spgnum == 0 or use_find_wy:
-        stat.set('input', 'minlen', '{}'.format(minlen))
-        stat.set('input', 'maxlen', '{}'.format(maxlen))
-        stat.set('input', 'dangle', '{}'.format(dangle))
+    if mindist is None:
+        stat.set('input', 'mindist', '{}'.format(mindist))
+    else:
         for i in range(len(atype)):
             stat.set('input', 'mindist_{}'.format(i+1),
                      '{}'.format(' '.join(str(c) for c in mindist[i])))
-        stat.set('input', 'vol_mu', '{}'.format(vol_mu))
-        stat.set('input', 'vol_sigma', '{}'.format(vol_sigma))
+    stat.set('input', 'minlen', '{}'.format(minlen))
+    stat.set('input', 'maxlen', '{}'.format(maxlen))
+    stat.set('input', 'dangle', '{}'.format(dangle))
 
     # ---------- BO
     if algo == 'BO':
@@ -877,7 +907,18 @@ def diffinstat(stat):
     else:
         old_nmol = [int(x) for x in old_nmol.split()]    # str --> int list
     old_timeout_mol = stat.getfloat('input', 'timeout_mol')
-    old_vol_factor = stat.getfloat('input', 'vol_factor')
+    old_vol_factor = stat.get('input', 'vol_factor')
+    old_vol_factor = [float(x) for x in old_vol_factor.split()]    # str --> float list
+    old_vol_mu = stat.get('input', 'vol_mu')
+    if old_vol_mu == 'None':
+        old_vol_mu = None    # character --> None
+    else:
+        old_vol_mu = float(old_vol_mu)    # character --> float
+    old_vol_sigma = stat.get('input', 'vol_sigma')
+    if old_vol_sigma == 'None':
+        old_vol_sigma = None    # character --> None
+    else:
+        old_vol_sigma = float(old_vol_sigma)    # character --> float
     old_maxcnt = stat.getint('input', 'maxcnt')
     old_symprec = stat.getfloat('input', 'symprec')
     old_spgnum = stat.get('input', 'spgnum')
@@ -885,27 +926,32 @@ def diffinstat(stat):
         old_spgnum = 0
     elif not old_spgnum == 'all':
         old_spgnum = [int(x) for x in old_spgnum.split()]    # int list
+    old_check_mindist = stat.getboolean('input', 'check_mindist')
     old_use_find_wy = stat.getboolean('input', 'use_find_wy')
-    # -- spgnum == 0 or use_find_wy
-    if old_spgnum == 0 or old_use_find_wy:
-        old_minlen = stat.getfloat('input', 'minlen')
-        old_maxlen = stat.getfloat('input', 'maxlen')
-        old_dangle = stat.getfloat('input', 'dangle')
+    old_mindist = stat.get('input', 'mindist')
+    if old_mindist == 'None':
+        old_mindist = None    # character --> None
+    else:
         old_mindist = []
         for i in range(len(atype)):
             tmp = stat.get('input', 'mindist_{}'.format(i+1))
             tmp = [float(x) for x in tmp.split()]    # character --> float
             old_mindist.append(tmp)
-        old_vol_mu = stat.get('input', 'vol_mu')
-        if old_vol_mu == 'None':
-            old_vol_mu = None    # character --> None
-        else:
-            old_vol_mu = float(old_vol_mu)    # character --> float
-        old_vol_sigma = stat.get('input', 'vol_sigma')
-        if old_vol_sigma == 'None':
-            old_vol_sigma = None    # character --> None
-        else:
-            old_vol_sigma = float(old_vol_sigma)    # character --> float
+    old_minlen = stat.get('input', 'minlen')
+    if old_minlen == 'None':
+        old_minlen = None    # character --> None
+    else:
+        old_minlen = float(old_minlen)    # character --> float
+    old_maxlen = stat.get('input', 'maxlen')
+    if old_maxlen == 'None':
+        old_maxlen = None    # character --> None
+    else:
+        old_maxlen = float(old_maxlen)    # character --> float
+    old_dangle = stat.get('input', 'dangle')
+    if old_dangle == 'None':
+        old_dangle = None    # character --> None
+    else:
+        old_dangle = float(old_dangle)    # character --> float
 
     # ------ BO
     if old_algo == 'BO':
@@ -1064,7 +1110,16 @@ def diffinstat(stat):
         logic_change = True
     if not old_vol_factor == vol_factor:
         diff_out('vol_factor', old_vol_factor, vol_factor)
-        io_stat.set_input_common(stat, 'vol_factor', vol_factor)
+        io_stat.set_input_common(stat, 'vol_factor', '{}'.format(
+                ' '.join(str(x) for x in vol_factor)))
+        logic_change = True
+    if not old_vol_mu == vol_mu:
+        diff_out('vol_mu', old_vol_mu, vol_mu)
+        io_stat.set_input_common(stat, 'vol_mu', vol_mu)
+        logic_change = True
+    if not old_vol_sigma == vol_sigma:
+        diff_out('vol_sigma', old_vol_sigma, vol_sigma)
+        io_stat.set_input_common(stat, 'vol_sigma', vol_sigma)
         logic_change = True
     if not old_maxcnt == maxcnt:
         diff_out('maxcnt', old_maxcnt, maxcnt)
@@ -1082,60 +1137,46 @@ def diffinstat(stat):
             io_stat.set_input_common(stat, 'spgnum', '{}'.format(
                 ' '.join(str(x) for x in spgnum)))
         logic_change = True
+    if not old_check_mindist == check_mindist:
+        diff_out('check_mindist', old_check_mindist, check_mindist)
+        io_stat.set_input_common(stat, 'check_mindist', check_mindist)
+        logic_change = True
     if not old_use_find_wy == use_find_wy:
         diff_out('use_find_wy', old_use_find_wy, use_find_wy)
         io_stat.set_input_common(stat, 'use_find_wy', use_find_wy)
         logic_change = True
-    # -- spgnum == 0 or use_find_wy
-    if (spgnum == 0 or use_find_wy) and (old_spgnum == 0 or old_use_find_wy):
-        if not old_minlen == minlen:
-            diff_out('minlen', old_minlen, minlen)
-            io_stat.set_input_common(stat, 'minlen', minlen)
-            logic_change = True
-        if not old_maxlen == maxlen:
-            diff_out('maxlen', old_maxlen, maxlen)
-            io_stat.set_input_common(stat, 'maxlen', maxlen)
-            logic_change = True
-        if not old_dangle == dangle:
-            diff_out('dangle', old_dangle, dangle)
-            io_stat.set_input_common(stat, 'dangle', dangle)
-            logic_change = True
-        if not old_mindist == mindist:
-            diff_out('mindist', old_mindist, mindist)
+    if not old_mindist == mindist:
+        diff_out('mindist', old_mindist, mindist)
+        # -- case: old_mindist = None, mindist = []
+        if old_mindist is None:
+            stat.remove_option('input', 'mindist')    # clear mindist
+            for i in range(len(atype)):               # add mindist_?
+                io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
+                                         '{}'.format(' '.join(
+                                             str(x) for x in mindist[i])))
+        # -- case: old_mindist = [], mindist = None
+        elif mindist is None:
+            for i in range(len(atype)):    # clear mindist_?
+                stat.remove_option('input', 'mindist_{}'.format(i+1))
+            io_stat.set_input_common(stat, 'mindist', mindist)    # add mindist
+        # -- case: old_mindist = [], mindist = [], update list
+        else:
             for i in range(len(atype)):
                 io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
                                          '{}'.format(' '.join(
                                              str(x) for x in mindist[i])))
-            logic_change = True
-        if not old_vol_mu == vol_mu:
-            diff_out('vol_mu', old_vol_mu, vol_mu)
-            io_stat.set_input_common(stat, 'vol_mu', vol_mu)
-            logic_change = True
-        if not old_vol_sigma == vol_sigma:
-            diff_out('vol_sigma', old_vol_sigma, vol_sigma)
-            io_stat.set_input_common(stat, 'vol_sigma', vol_sigma)
-            logic_change = True
-    elif (spgnum == 0 or use_find_wy) and (not (old_spgnum == 0 or old_use_find_wy)):
-        # -- write for the change: pyxtal --> find_wy
-        io_stat.set_input_common(stat, 'minlen', minlen)
-        io_stat.set_input_common(stat, 'maxlen', maxlen)
-        io_stat.set_input_common(stat, 'dangle', dangle)
-        for i in range(len(atype)):
-            io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
-                                     '{}'.format(' '.join(
-                                         str(x) for x in mindist[i])))
-        io_stat.set_input_common(stat, 'vol_mu', vol_mu)
-        io_stat.set_input_common(stat, 'vol_sigma', vol_sigma)
         logic_change = True
-    elif (not (spgnum == 0 or use_find_wy)) and (old_spgnum == 0 or old_use_find_wy):
-        # -- clear
-        stat.remove_option('input', 'minlen')
-        stat.remove_option('input', 'maxlen')
-        stat.remove_option('input', 'dangle')
-        for i in range(len(atype)):
-            stat.remove_option('input', 'mindist_{}'.format(i+1))
-        stat.remove_option('input', 'vol_mu')
-        stat.remove_option('input', 'vol_sigma')
+    if not old_minlen == minlen:
+        diff_out('minlen', old_minlen, minlen)
+        io_stat.set_input_common(stat, 'minlen', minlen)
+        logic_change = True
+    if not old_maxlen == maxlen:
+        diff_out('maxlen', old_maxlen, maxlen)
+        io_stat.set_input_common(stat, 'maxlen', maxlen)
+        logic_change = True
+    if not old_dangle == dangle:
+        diff_out('dangle', old_dangle, dangle)
+        io_stat.set_input_common(stat, 'dangle', dangle)
         logic_change = True
 
     # ------ BO

@@ -12,8 +12,10 @@ import sys
 from pyxtal.crystal import random_crystal
 from pyxtal.molecular_crystal import molecular_crystal
 
+from ..struc_util import check_distance
 from ..struc_util import sort_by_atype
 from ..struc_util import out_poscar
+from ..struc_util import scale_cell_mol
 
 
 class Rnd_struc_gen_pyxtal:
@@ -27,8 +29,24 @@ class Rnd_struc_gen_pyxtal:
 
     nat (list): number of atom, e.g. [4, 8] for Si4O8
 
-    vol_factor (int or float): default --> 1.0
-                        volume factor
+    vol_factor (list): default --> [1.0, 1.0]
+                       [min, max] int or float
+
+    vol_mu (int or float or None): default --> None
+                                   average volume in Gaussian distribution
+                                   when you scale cell volume
+
+    vol_sigma (int or float or None): default --> None
+                                      standard deviation in Gaussian distribution
+                                      when you scale cell volume
+
+    mindist (2d list): default --> None
+                       constraint on minimum interatomic distance,
+                       mindist must be a symmetric matrix
+        e.g. [[1.8, 1.2], [1.2, 1.5]]
+            Si - Si: 1.8 angstrom
+            Si -  O: 1.2
+             O -  O: 1.5
 
     spgnum ('all' or list): space group numbers which you use
                             'all' --> 1--230
@@ -38,8 +56,9 @@ class Rnd_struc_gen_pyxtal:
                      tolerance for symmetry finding
     '''
 
-    def __init__(self, natot, atype, nat, vol_factor=1.0,
-                 spgnum='all', symprec=0.01):
+    def __init__(self, natot, atype, nat, vol_factor=[1.0, 1.0],
+                 vol_mu=None, vol_sigma=None,
+                 mindist=None, spgnum='all', symprec=0.01):
         # ---------- check args
         # ------ int
         for i in [natot]:
@@ -48,16 +67,37 @@ class Rnd_struc_gen_pyxtal:
             else:
                 raise ValueError('natot must be positive int')
         # ------ list
-        for x in [atype, nat]:
+        for x in [atype, nat, vol_factor]:
             if type(x) is not list:
-                raise ValueError('atype and nat must be list')
+                raise ValueError('atype, nat, and vol_factor must be list')
         if not len(atype) == len(nat):
             raise ValueError('not len(atype) == len(nat)')
         # ------ vol_factor
-        if type(vol_factor) is not float and type(vol_factor) is not int:
-            raise ValueError('vol_factor must be int or float')
-        if vol_factor <= 0:
-            raise ValueError('vol_factor must be positive')
+        if len(vol_factor) == 2:
+            if not 0 < vol_factor[0] <= vol_factor[1]:
+                raise ValueError('0 < vol_factor[0] <= vol_factor[1]')
+        else:
+            raise ValueError('length of vol_factor must be 2')
+        # ------ vol_mu, vol_sigma
+        if vol_mu is not None:
+            for x in [vol_mu, vol_sigma]:
+                if type(x) is not float and type(x) is not int:
+                    raise ValueError('vol_mu and vol_sigma must be int or float')
+            if vol_mu <= 0:
+                raise ValueError('vol_mu must be positive')
+        # ------ mindist
+        if mindist is not None:
+            if not len(atype) == len(mindist):
+                raise ValueError('not len(atype) == len(mindist)')
+            # -- check symmetric
+            for i in range(len(mindist)):
+                for j in range(i):
+                    if not mindist[i][j] == mindist[j][i]:
+                        raise ValueError('mindist is not symmetric. '
+                                         '({}, {}): {}, ({}, {}): {}'.format(
+                                             i, j, mindist[i][j],
+                                             j, i, mindist[j][i]))
+
         # ------ spgnum
         if spgnum == 'all' or type(spgnum) is list:
             pass
@@ -68,6 +108,9 @@ class Rnd_struc_gen_pyxtal:
         self.atype = atype
         self.nat = nat
         self.vol_factor = vol_factor
+        self.vol_mu = vol_mu
+        self.vol_sigma = vol_sigma
+        self.mindist = mindist
         self.spgnum = spgnum
         self.symprec = symprec
         # ------ error list for spg number
@@ -82,7 +125,7 @@ class Rnd_struc_gen_pyxtal:
                          one can also use pre-defined strings such as
                          H2O, CH4, benzene, ... etc.
                          see PyXtal document
- 
+
         nmol (list): number of molecules
 
         # ---------- example
@@ -154,9 +197,11 @@ class Rnd_struc_gen_pyxtal:
                 spg = random.choice(self.spgnum)
             if spg in self.spg_error:
                 continue
+            # ------ vol_factor
+            rand_vol = random.uniform(self.vol_factor[0], self.vol_factor[1])
             # ------ generate structure
             tmp_crystal = random_crystal(spg, self.atype,
-                                         self.nat, self.vol_factor)
+                                         self.nat, rand_vol)
             if tmp_crystal.valid:
                 #tmp_struc = tmp_crystal.struct    # pymatgen Structure format, old pyxtal
                 tmp_struc = tmp_crystal.to_pymatgen()    # pymatgen Structure format
@@ -169,6 +214,14 @@ class Rnd_struc_gen_pyxtal:
                         continue
                 # -- sort, just in case
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
+                # -- scale volume
+                if self.vol_mu is not None:
+                    vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
+                    tmp_struc.scale_lattice(volume=vol)
+                # -- check minimum distance
+                if self.mindist is not None:
+                    if not check_distance(tmp_struc, self.atype, self.mindist):
+                        continue    # failure
                 # -- check actual space group
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -188,7 +241,8 @@ class Rnd_struc_gen_pyxtal:
             else:
                 self.spg_error.append(spg)
 
-    def gen_struc_mol(self, nstruc, id_offset=0, init_pos_path=None, timeout_mol=20):
+    def gen_struc_mol(self, nstruc, id_offset=0, init_pos_path=None,
+                      timeout_mol=180):
         '''
         Generate random molecular crystal structures for given space groups
         one have to run self.set_mol() in advance
@@ -235,10 +289,11 @@ class Rnd_struc_gen_pyxtal:
                 spg = random.choice(self.spgnum)
             if spg in self.spg_error:
                 continue
+            rand_vol = random.uniform(self.vol_factor[0], self.vol_factor[1])
             # ------ generate structure
             # -- multiprocess for measures against hangup
             q = Queue()
-            p = Process(target=self._mp_mc, args=(spg, q))
+            p = Process(target=self._mp_mc, args=(spg, rand_vol, q))
             p.start()
             p.join(timeout=timeout_mol)
             if p.is_alive():
@@ -253,7 +308,14 @@ class Rnd_struc_gen_pyxtal:
             else:
                 tmp_struc = q.get()
                 tmp_valid = q.get()
+                if tmp_struc == 'error':
+                    raise NameError('could not load  mol_file')
             if tmp_valid:
+                # -- scale volume
+                if self.vol_mu is not None:
+                    vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
+                    vol = vol * tmp_struc.num_sites / self.natot    # for conv. cell
+                    tmp_struc = scale_cell_mol(tmp_struc, self.mol_file, vol)
                 # -- check nat
                 if not self._check_nat(tmp_struc):
                     # pyxtal returns conventional cell,
@@ -264,6 +326,10 @@ class Rnd_struc_gen_pyxtal:
                         continue
                 # -- sort, necessary in molecular crystal
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
+                # -- check minimum distance
+                if self.mindist is not None:
+                    if not check_distance(tmp_struc, self.atype, self.mindist):
+                        continue
                 # -- check actual space group
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -291,13 +357,22 @@ class Rnd_struc_gen_pyxtal:
                 return False    # failure
         return True
 
-    def _mp_mc(self, spg, q):
+    def _mp_mc(self, spg, rand_vol, q):
         '''multiprocess part'''
-        # ---------- temporarily stdout --> devnull
-        with redirect_stdout(open(os.devnull, 'w')):
-            tmp_crystal = molecular_crystal(spg, self.mol_file,
-                                            self.nmol, self.vol_factor)
-        # ---------- queue
-        #q.put(tmp_crystal.struct)    # old pyxtal
-        q.put(tmp_crystal.to_pymatgen())
-        q.put(tmp_crystal.valid)
+        try:
+            # ---------- temporarily stdout --> devnull
+            with redirect_stdout(open(os.devnull, 'w')):
+                tmp_crystal = molecular_crystal(spg, self.mol_file,
+                                                self.nmol, rand_vol)
+                # ---------- queue
+                #q.put(tmp_crystal.struct)    # old pyxtal
+            if tmp_crystal.valid:
+                q.put(tmp_crystal.to_pymatgen())
+                q.put(tmp_crystal.valid)
+            else:
+                q.put(None)
+                q.put(tmp_crystal.valid)
+        except (NameError):
+            # ------ no molecule file
+            q.put('error')
+            q.put(None)

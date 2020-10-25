@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # extract_struc.py
 #   2020/05/26 T. Yamashita

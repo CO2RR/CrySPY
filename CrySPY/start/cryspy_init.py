@@ -49,6 +49,8 @@ def initialize():
         if not (rin.spgnum == 0 or rin.use_find_wy):
             rsgx = Rnd_struc_gen_pyxtal(natot=rin.natot, atype=rin.atype,
                                         nat=rin.nat, vol_factor=rin.vol_factor,
+                                        vol_mu=rin.vol_mu, vol_sigma=rin.vol_sigma,
+                                        mindist=rin.mindist,
                                         spgnum=rin.spgnum, symprec=rin.symprec)
             # ------ crystal
             if rin.struc_mode == 'crystal':

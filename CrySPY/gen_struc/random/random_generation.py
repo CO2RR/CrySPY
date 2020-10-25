@@ -34,7 +34,7 @@ class Rnd_struc_gen:
 
     mindist (2d list): constraint on minimum interatomic distance,
                        mindist must be a symmetric matrix
-        e.g. [[1.8, 1.2], [1.2, 1.5]
+        e.g. [[1.8, 1.2], [1.2, 1.5]]
             Si - Si: 1.8 angstrom
             Si -  O: 1.2
              O -  O: 1.5
@@ -156,6 +156,9 @@ class Rnd_struc_gen:
                 if self.vol_mu is not None:
                     vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
                     tmp_struc.scale_lattice(volume=vol)
+                    if not check_distance(tmp_struc, self.atype, self.mindist):
+                        continue    # failure
+                # --
                 # ------ check actual space group using pymatgen
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -258,6 +261,8 @@ class Rnd_struc_gen:
             if self.vol_mu is not None:
                 vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
                 tmp_struc.scale_lattice(volume=vol)
+                if not check_distance(tmp_struc, self.atype, self.mindist):
+                    continue    # failure
             # ------ check actual space group using pymatgen
             try:
                 spg_sym, spg_num = tmp_struc.get_space_group_info(
@@ -502,7 +507,8 @@ class Rnd_struc_gen:
                 # -- check minimum distance
                 spgstruc = Structure(plat, atomnames, cart,
                                      coords_are_cartesian=True)
-                if check_distance(spgstruc, self.atype, self.mindist) is False:
+                if not check_distance(spgstruc, self.atype, self.mindist):
+                    # failure
                     # num_uniqvar = 0 --> value == 0
                     cnt = self.maxcnt + 1 if value == 0 else cnt + 1
                     if self.maxcnt < cnt:
