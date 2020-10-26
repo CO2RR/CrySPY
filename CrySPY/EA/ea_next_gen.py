@@ -117,7 +117,7 @@ def next_gen(stat, init_struc_data, opt_struc_data, rslt_data, ea_id_data):
               rin.tot_struc, rin.tot_struc + rin.n_pop))
 
     # ---------- status
-    io_stat.set_input_common(stat, 'tot_struc', rin.tot_struc + rin.n_pop)
+    io_stat.set_input_common(stat, 'basic', 'tot_struc', rin.tot_struc + rin.n_pop)
     io_stat.set_common(stat, 'generation', gen)
     io_stat.set_id(stat, 'id_queueing', id_queueing)
     io_stat.write_stat(stat)

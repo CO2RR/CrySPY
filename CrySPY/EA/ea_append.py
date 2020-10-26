@@ -98,8 +98,8 @@ def append_struc(stat, init_struc_data):
     change_input.write_config(config)
 
     # ---------- status
-    io_stat.set_input_common(stat, 'tot_struc', rin.tot_struc)
-    io_stat.set_input_common(stat, 'append_struc_ea', False)
+    io_stat.set_input_common(stat, 'basic', 'tot_struc', rin.tot_struc)
+    io_stat.set_input_common(stat, 'option', 'append_struc_ea', False)
     io_stat.write_stat(stat)
 
     # ---------- return

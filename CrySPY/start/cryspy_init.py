@@ -27,12 +27,10 @@ def initialize():
         fout.write(utility.get_version() + '\n')
         fout.write('Start cryspy.py\n\n')
 
-    # ---------- initialize stat
-    stat = io_stat.stat_init()
-
     # ---------- read input
     print('Read input file, cryspy.in')
     rin.readin()          # read input data, cryspy,in
+    stat = io_stat.stat_init()    # initialize stat
     rin.writeout()        # write input data in output file, cryspy.out
     rin.save_stat(stat)   # save input variables in cryspy.stat
 

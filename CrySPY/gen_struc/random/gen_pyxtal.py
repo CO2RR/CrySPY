@@ -220,7 +220,13 @@ class Rnd_struc_gen_pyxtal:
                     tmp_struc.scale_lattice(volume=vol)
                 # -- check minimum distance
                 if self.mindist is not None:
-                    if not check_distance(tmp_struc, self.atype, self.mindist):
+                    success, mindist_ij, dist = check_distance(tmp_struc,
+                                                               self.atype,
+                                                               self.mindist)
+                    if not success:
+                        sys.stderr.write('mindist in gen_struc: {} - {}, {}. retry.\n'.format(self.atype[mindist_ij[0]],
+                                                                                              self.atype[mindist_ij[1]],
+                                                                                              dist))
                         continue    # failure
                 # -- check actual space group
                 try:
@@ -303,7 +309,7 @@ class Rnd_struc_gen_pyxtal:
                 # Process.close() available from python 3.7
                 p.close()
             if q.empty():
-                print('timeout for molecular structure generation. retry.')
+                sys.stderr.write('timeout for molecular structure generation. retry.\n')
                 continue
             else:
                 tmp_struc = q.get()
@@ -328,8 +334,15 @@ class Rnd_struc_gen_pyxtal:
                 tmp_struc = sort_by_atype(tmp_struc, self.atype)
                 # -- check minimum distance
                 if self.mindist is not None:
-                    if not check_distance(tmp_struc, self.atype, self.mindist):
-                        continue
+                    success, mindist_ij, dist = check_distance(tmp_struc,
+                                                               self.atype,
+                                                               self.mindist)
+                    if not success:
+                        sys.stderr.write('mindist in gen_struc_mol: {} - {}, {}. retry.\n'.format(
+                            self.atype[mindist_ij[0]],
+                            self.atype[mindist_ij[1]],
+                            dist))
+                        continue    # failure
                 # -- check actual space group
                 try:
                     spg_sym, spg_num = tmp_struc.get_space_group_info(

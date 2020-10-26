@@ -124,7 +124,7 @@ class Ctrl_job:
         change_input.change_option(config, 'recalc', '')    # clear
         change_input.write_config(config)
         print('Clear recalc in cryspy.in')
-        io_stat.set_input_common(self.stat, 'recalc', '')
+        io_stat.set_input_common(self.stat, 'option', 'recalc', '')
         io_stat.write_stat(self.stat)
 
     def handle_job(self):

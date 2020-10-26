@@ -1,7 +1,7 @@
 [basic]
 algo = RS
 calc_code = QE
-tot_struc = 5
+tot_struc = 10
 nstage = 2
 njob = 2
 jobcmd = qsub
@@ -14,9 +14,13 @@ atype = Li P S
 nat = 6 2 8
 mol_file = ./Li.xyz ./PS4.xyz
 nmol = 6 2
-#vol_factor = 1.5
-#vol_mu = 400
-#vol_sigma = 40
+#vol_factor = 1.0
+vol_mu = 400
+vol_sigma = 40
+mindist_1 = 3.0 2.0 2.0
+mindist_2 = 2.0 4.0 2.0
+mindist_3 = 2.0 2.0 3.0
+timeout_mol = 60
 
 [QE]
 qe_infile = pwscf.in

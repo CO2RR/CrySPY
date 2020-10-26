@@ -100,8 +100,9 @@ def check_distance(struc, atype, mindist, check_all=False):
                        if False, stop when (dist < mindist) is found,
                                  return True or False (see below)
     # ---------- return
-    (check_all=False) True: nothing smaller than mindist
-    (check_all=False) False: something smaller than mindst
+    (check_all=False) True, None, None: nothing smaller than mindist
+    (check_all=False) False, (i, j), dist: something smaller than mindst
+                                     here, (i, j) means mindist(i, j)
     (check_all=True) dist_list: if dist_list is vacant,
                                     nothing smaller than mindist
     '''
@@ -117,8 +118,8 @@ def check_distance(struc, atype, mindist, check_all=False):
             if check_all:
                 dist_list.append((0, 0, dist))
                 return dist_list
-            return False
-        return True
+            return False, (0, 0), dist
+        return True, None, None
 
     # ---------- normal case
     for i in range(struc.num_sites):
@@ -130,7 +131,7 @@ def check_distance(struc, atype, mindist, check_all=False):
                 if check_all:
                     dist_list.append((j, i, dist))
                 else:
-                    return False
+                    return False, (i_type, j_type), dist
 
     # ---------- return
     if check_all:
@@ -139,7 +140,7 @@ def check_distance(struc, atype, mindist, check_all=False):
             return dist_list
         else:
             return dist_list    # dist_list is vacant list
-    return True
+    return True, None, None
 
 
 def scale_cell_mol(struc, mol_file, volume):

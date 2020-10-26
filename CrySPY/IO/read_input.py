@@ -48,9 +48,9 @@ def readin():
     # ---------- structure
     # ------ global declaration
     global struc_mode, natot, atype, nat, mol_file, nmol, timeout_mol
-    global vol_factor, vol_mu, vol_sigma
-    global maxcnt, symprec, spgnum, use_find_wy, check_mindist
-    global mindist, minlen, maxlen, dangle
+    global vol_factor, vol_mu, vol_sigma, mindist
+    global maxcnt, symprec, spgnum, use_find_wy
+    global minlen, maxlen, dangle
 
     # ------ read intput variables
     try:
@@ -146,10 +146,6 @@ def readin():
     else:
         spgnum = spglist(spgnum)
     try:
-        check_mindist = config.getboolean('structure', 'check_mindist')
-    except (configparser.NoOptionError, configparser.NoSectionError):
-        check_mindist = False
-    try:
         use_find_wy = config.getboolean('structure', 'use_find_wy')
     except (configparser.NoOptionError, configparser.NoSectionError):
         use_find_wy = False
@@ -157,8 +153,7 @@ def readin():
         if not struc_mode == 'crystal':
             raise ValueError('find_wy can be use if struc_mode is crystal')
     # ------ mindist
-    mindist = None
-    if spgnum == 0 or check_mindist or use_find_wy:
+    try:
         mindist = []
         for i in range(len(atype)):
             tmp = config.get('structure', 'mindist_{}'.format(i+1))
@@ -175,6 +170,10 @@ def readin():
                                          ' {}, ({}, {}) --> {}'.format(
                                              i, j, mindist[i][j],
                                              j, i, mindist[j][i]))
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        if spgnum == 0 or use_find_wy:
+            raise ValueError('need mindist in spgnum == 0 or use_find_wy')
+        mindist = None
     # ------ spgnum == 0 or use_find_wy
     minlen = None
     maxlen = None
@@ -610,6 +609,12 @@ def writeout():
         fout.write('vol_factor = {}\n'.format(' '.join(str(b) for b in vol_factor)))
         fout.write('vol_mu = {}\n'.format(vol_mu))
         fout.write('vol_sigma = {}\n'.format(vol_sigma))
+        if mindist is None:
+            fout.write('mindist = {}\n'.format(mindist))
+        else:
+            for i in range(len(atype)):
+                fout.write('mindist_{0} = {1}\n'.format(
+                    i+1, ' '.join(str(c) for c in mindist[i])))
         fout.write('maxcnt = {}\n'.format(maxcnt))
         fout.write('symprec = {}\n'.format(symprec))
         if spgnum == 0 or spgnum == 'all':
@@ -617,14 +622,7 @@ def writeout():
         else:
             fout.write('spgnum = {}\n'.format(
                 ' '.join(str(d) for d in spgnum)))
-        fout.write('check_mindist = {}\n'.format(check_mindist))
         fout.write('use_find_wy = {}\n'.format(use_find_wy))
-        if mindist is None:
-            fout.write('mindist = {}\n'.format(mindist))
-        else:
-            for i in range(len(atype)):
-                fout.write('mindist_{0} = {1}\n'.format(
-                    i+1, ' '.join(str(c) for c in mindist[i])))
         fout.write('minlen = {}\n'.format(minlen))
         fout.write('maxlen = {}\n'.format(maxlen))
         fout.write('dangle = {}\n'.format(dangle))
@@ -736,141 +734,140 @@ def writeout():
 def save_stat(stat):    # only 1st run
     print('Save input data in cryspy.stat')
     # ---------- basic
-    stat.set('input', 'algo', '{}'.format(algo))
-    stat.set('input', 'calc_code', '{}'.format(calc_code))
-    stat.set('input', 'tot_struc', '{}'.format(tot_struc))
-    stat.set('input', 'nstage', '{}'.format(nstage))
-    stat.set('input', 'njob', '{}'.format(njob))
-    stat.set('input', 'jobcmd', '{}'.format(jobcmd))
-    stat.set('input', 'jobfile', '{}'.format(jobfile))
+    stat.set('basic', 'algo', '{}'.format(algo))
+    stat.set('basic', 'calc_code', '{}'.format(calc_code))
+    stat.set('basic', 'tot_struc', '{}'.format(tot_struc))
+    stat.set('basic', 'nstage', '{}'.format(nstage))
+    stat.set('basic', 'njob', '{}'.format(njob))
+    stat.set('basic', 'jobcmd', '{}'.format(jobcmd))
+    stat.set('basic', 'jobfile', '{}'.format(jobfile))
 
     # ---------- structure
-    stat.set('input', 'struc_mode', '{}'.format(struc_mode))
-    stat.set('input', 'natot', '{}'.format(natot))
-    stat.set('input', 'atype', '{}'.format(' '.join(a for a in atype)))
-    stat.set('input', 'nat', '{}'.format(' '.join(str(b) for b in nat)))
+    stat.set('structure', 'struc_mode', '{}'.format(struc_mode))
+    stat.set('structure', 'natot', '{}'.format(natot))
+    stat.set('structure', 'atype', '{}'.format(' '.join(a for a in atype)))
+    stat.set('structure', 'nat', '{}'.format(' '.join(str(b) for b in nat)))
     if mol_file is None:
-        stat.set('input', 'mol_file', '{}'.format(mol_file))
+        stat.set('structure', 'mol_file', '{}'.format(mol_file))
     else:
-        stat.set('input', 'mol_file', '{}'.format(' '.join(a for a in mol_file)))
+        stat.set('structure', 'mol_file', '{}'.format(' '.join(a for a in mol_file)))
     if nmol is None:
-        stat.set('input', 'nmol', '{}'.format(nmol))
+        stat.set('structure', 'nmol', '{}'.format(nmol))
     else:
-        stat.set('input', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
-    stat.set('input', 'timeout_mol', '{}'.format(timeout_mol))
-    stat.set('input', 'vol_factor', '{}'.format(' '.join(str(b) for b in vol_factor)))
-    stat.set('input', 'vol_mu', '{}'.format(vol_mu))
-    stat.set('input', 'vol_sigma', '{}'.format(vol_sigma))
-    stat.set('input', 'maxcnt', '{}'.format(maxcnt))
-    stat.set('input', 'symprec', '{}'.format(symprec))
-    if spgnum == 0 or spgnum == 'all':
-        stat.set('input', 'spgnum', '{}'.format(spgnum))
-    else:
-        stat.set('input', 'spgnum',
-                 '{}'.format(' '.join(str(d) for d in spgnum)))
-    stat.set('input', 'check_mindist', '{}'.format(check_mindist))
-    stat.set('input', 'use_find_wy', '{}'.format(use_find_wy))
+        stat.set('structure', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
+    stat.set('structure', 'timeout_mol', '{}'.format(timeout_mol))
+    stat.set('structure', 'vol_factor', '{}'.format(' '.join(str(b) for b in vol_factor)))
+    stat.set('structure', 'vol_mu', '{}'.format(vol_mu))
+    stat.set('structure', 'vol_sigma', '{}'.format(vol_sigma))
     if mindist is None:
-        stat.set('input', 'mindist', '{}'.format(mindist))
+        stat.set('structure', 'mindist', '{}'.format(mindist))
     else:
         for i in range(len(atype)):
-            stat.set('input', 'mindist_{}'.format(i+1),
+            stat.set('structure', 'mindist_{}'.format(i+1),
                      '{}'.format(' '.join(str(c) for c in mindist[i])))
-    stat.set('input', 'minlen', '{}'.format(minlen))
-    stat.set('input', 'maxlen', '{}'.format(maxlen))
-    stat.set('input', 'dangle', '{}'.format(dangle))
+    stat.set('structure', 'maxcnt', '{}'.format(maxcnt))
+    stat.set('structure', 'symprec', '{}'.format(symprec))
+    if spgnum == 0 or spgnum == 'all':
+        stat.set('structure', 'spgnum', '{}'.format(spgnum))
+    else:
+        stat.set('structure', 'spgnum',
+                 '{}'.format(' '.join(str(d) for d in spgnum)))
+    stat.set('structure', 'use_find_wy', '{}'.format(use_find_wy))
+    stat.set('structure', 'minlen', '{}'.format(minlen))
+    stat.set('structure', 'maxlen', '{}'.format(maxlen))
+    stat.set('structure', 'dangle', '{}'.format(dangle))
 
     # ---------- BO
     if algo == 'BO':
-        stat.set('input', 'nselect_bo', '{}'.format(nselect_bo))
-        stat.set('input', 'score', '{}'.format(score))
-        stat.set('input', 'num_rand_basis', '{}'.format(num_rand_basis))
-        stat.set('input', 'cdev', '{}'.format(cdev))
-        stat.set('input', 'dscrpt', '{}'.format(dscrpt))
-        stat.set('input', 'fp_rmin', '{}'.format(fp_rmin))
-        stat.set('input', 'fp_rmax', '{}'.format(fp_rmax))
-        stat.set('input', 'fp_npoints', '{}'.format(fp_npoints))
-        stat.set('input', 'fp_sigma', '{}'.format(fp_sigma))
-        stat.set('input', 'max_select_bo', '{}'.format(max_select_bo))
-        stat.set('input', 'manual_select_bo', '{}'.format(
+        stat.set('BO', 'nselect_bo', '{}'.format(nselect_bo))
+        stat.set('BO', 'score', '{}'.format(score))
+        stat.set('BO', 'num_rand_basis', '{}'.format(num_rand_basis))
+        stat.set('BO', 'cdev', '{}'.format(cdev))
+        stat.set('BO', 'dscrpt', '{}'.format(dscrpt))
+        stat.set('BO', 'fp_rmin', '{}'.format(fp_rmin))
+        stat.set('BO', 'fp_rmax', '{}'.format(fp_rmax))
+        stat.set('BO', 'fp_npoints', '{}'.format(fp_npoints))
+        stat.set('BO', 'fp_sigma', '{}'.format(fp_sigma))
+        stat.set('BO', 'max_select_bo', '{}'.format(max_select_bo))
+        stat.set('BO', 'manual_select_bo', '{}'.format(
             ' '.join(str(x) for x in manual_select_bo)))
 
     # ---------- LAQA
     if algo == 'LAQA':
-        stat.set('input', 'nselect_laqa', '{}'.format(nselect_laqa))
-        stat.set('input', 'weight_laqa', '{}'.format(weight_laqa))
+        stat.set('LAQA', 'nselect_laqa', '{}'.format(nselect_laqa))
+        stat.set('LAQA', 'weight_laqa', '{}'.format(weight_laqa))
 
     # ---------- EA
     elif algo == 'EA' or append_struc_ea:
-        stat.set('input', 'n_pop', '{}'.format(n_pop))
-        stat.set('input', 'n_crsov', '{}'.format(n_crsov))
-        stat.set('input', 'n_perm', '{}'.format(n_perm))
-        stat.set('input', 'n_strain', '{}'.format(n_strain))
-        stat.set('input', 'n_rand', '{}'.format(n_rand))
-        stat.set('input', 'n_elite', '{}'.format(n_elite))
-        stat.set('input', 'fit_reverse', '{}'.format(fit_reverse))
-        stat.set('input', 'n_fittest', '{}'.format(n_fittest))
+        stat.set('EA', 'n_pop', '{}'.format(n_pop))
+        stat.set('EA', 'n_crsov', '{}'.format(n_crsov))
+        stat.set('EA', 'n_perm', '{}'.format(n_perm))
+        stat.set('EA', 'n_strain', '{}'.format(n_strain))
+        stat.set('EA', 'n_rand', '{}'.format(n_rand))
+        stat.set('EA', 'n_elite', '{}'.format(n_elite))
+        stat.set('EA', 'fit_reverse', '{}'.format(fit_reverse))
+        stat.set('EA', 'n_fittest', '{}'.format(n_fittest))
         for i in range(len(atype)):
-            stat.set('input', 'mindist_ea_{}'.format(i+1),
+            stat.set('EA', 'mindist_ea_{}'.format(i+1),
                      '{}'.format(' '.join(str(c) for c in mindist_ea[i])))
-        stat.set('input', 'slct_func', '{}'.format(slct_func))
+        stat.set('EA', 'slct_func', '{}'.format(slct_func))
         if slct_func == 'TNM':
-            stat.set('input', 't_size', '{}'.format(t_size))
+            stat.set('EA', 't_size', '{}'.format(t_size))
         elif slct_func == 'RLT':
-            stat.set('input', 'a_rlt', '{}'.format(a_rlt))
-            stat.set('input', 'b_rlt', '{}'.format(b_rlt))
-        stat.set('input', 'crs_lat', '{}'.format(crs_lat))
-        stat.set('input', 'nat_diff_tole', '{}'.format(nat_diff_tole))
-        stat.set('input', 'ntimes', '{}'.format(ntimes))
-        stat.set('input', 'sigma_st', '{}'.format(sigma_st))
-        stat.set('input', 'maxcnt_ea', '{}'.format(maxcnt_ea))
-        stat.set('input', 'maxgen_ea', '{}'.format(maxgen_ea))
+            stat.set('EA', 'a_rlt', '{}'.format(a_rlt))
+            stat.set('EA', 'b_rlt', '{}'.format(b_rlt))
+        stat.set('EA', 'crs_lat', '{}'.format(crs_lat))
+        stat.set('EA', 'nat_diff_tole', '{}'.format(nat_diff_tole))
+        stat.set('EA', 'ntimes', '{}'.format(ntimes))
+        stat.set('EA', 'sigma_st', '{}'.format(sigma_st))
+        stat.set('EA', 'maxcnt_ea', '{}'.format(maxcnt_ea))
+        stat.set('EA', 'maxgen_ea', '{}'.format(maxgen_ea))
 
     # ---------- VASP
     if calc_code == 'VASP':
-        stat.set('input', 'kppvol',
+        stat.set('VASP', 'kppvol',
                  '{}'.format(' '.join(str(c) for c in kppvol)))
-        stat.set('input', 'force_gamma', '{}'.format(force_gamma))
+        stat.set('VASP', 'force_gamma', '{}'.format(force_gamma))
 
     # ---------- QE
     if calc_code == 'QE':
-        stat.set('input', 'qe_infile', '{}'.format(qe_infile))
-        stat.set('input', 'qe_outfile', '{}'.format(qe_outfile))
-        stat.set('input', 'kppvol',
+        stat.set('QE', 'qe_infile', '{}'.format(qe_infile))
+        stat.set('QE', 'qe_outfile', '{}'.format(qe_outfile))
+        stat.set('QE', 'kppvol',
                  '{}'.format(' '.join(str(c) for c in kppvol)))
-        stat.set('input', 'force_gamma', '{}'.format(force_gamma))
+        stat.set('QE', 'force_gamma', '{}'.format(force_gamma))
 
     # ---------- OMX
     if calc_code == 'OMX':
-        stat.set('input', 'OMX_infile', '{}'.format(OMX_infile))
-        stat.set('input', 'OMX_outfile', '{}'.format(OMX_outfile))
-        stat.set('input', 'kppvol',
+        stat.set('OMX', 'OMX_infile', '{}'.format(OMX_infile))
+        stat.set('OMX', 'OMX_outfile', '{}'.format(OMX_outfile))
+        stat.set('OMX', 'kppvol',
                  '{}'.format(' '.join(str(c) for c in kppvol)))
-        stat.set('input', 'force_gamma', '{}'.format(force_gamma))
+        stat.set('OMX', 'force_gamma', '{}'.format(force_gamma))
 
     # ---------- soiap
     if calc_code == 'soiap':
-        stat.set('input', 'soiap_infile', '{}'.format(soiap_infile))
-        stat.set('input', 'soiap_outfile', '{}'.format(soiap_outfile))
-        stat.set('input', 'soiap_cif', '{}'.format(soiap_cif))
+        stat.set('soiap', 'soiap_infile', '{}'.format(soiap_infile))
+        stat.set('soiap', 'soiap_outfile', '{}'.format(soiap_outfile))
+        stat.set('soiap', 'soiap_cif', '{}'.format(soiap_cif))
 
     # ---------- lammps
     if calc_code == 'LAMMPS':
-        stat.set('input', 'lammps_infile', '{}'.format(lammps_infile))
-        stat.set('input', 'lammps_outfile', '{}'.format(lammps_outfile))
-        stat.set('input', 'lammps_potential',
+        stat.set('LAMMPS', 'lammps_infile', '{}'.format(lammps_infile))
+        stat.set('LAMMPS', 'lammps_outfile', '{}'.format(lammps_outfile))
+        stat.set('LAMMPS', 'lammps_potential',
                  '{}'.format(' '.join(lammps_potential)))
-        stat.set('input', 'lammps_data', '{}'.format(lammps_data))
+        stat.set('LAMMPS', 'lammps_data', '{}'.format(lammps_data))
 
     # ---------- option
-    stat.set('input', 'stop_chkpt', '{}'.format(stop_chkpt))
-    stat.set('input', 'load_struc_flag', '{}'.format(load_struc_flag))
-    stat.set('input', 'stop_next_struc', '{}'.format(stop_next_struc))
-    stat.set('input', 'recalc', '{}'.format(' '.join(str(x) for x in recalc)))
-    stat.set('input', 'append_struc_ea', '{}'.format(append_struc_ea))
-    stat.set('input', 'energy_step_flag', '{}'.format(energy_step_flag))
-    stat.set('input', 'struc_step_flag', '{}'.format(struc_step_flag))
-    stat.set('input', 'fs_step_flag', '{}'.format(fs_step_flag))
+    stat.set('option', 'stop_chkpt', '{}'.format(stop_chkpt))
+    stat.set('option', 'load_struc_flag', '{}'.format(load_struc_flag))
+    stat.set('option', 'stop_next_struc', '{}'.format(stop_next_struc))
+    stat.set('option', 'recalc', '{}'.format(' '.join(str(x) for x in recalc)))
+    stat.set('option', 'append_struc_ea', '{}'.format(append_struc_ea))
+    stat.set('option', 'energy_step_flag', '{}'.format(energy_step_flag))
+    stat.set('option', 'struc_step_flag', '{}'.format(struc_step_flag))
+    stat.set('option', 'fs_step_flag', '{}'.format(fs_step_flag))
 
     # ---------- write stat
     io_stat.write_stat(stat)
@@ -881,73 +878,72 @@ def diffinstat(stat):
 
     # ---------- old input
     # ------ basic
-    old_algo = stat.get('input', 'algo')
-    old_calc_code = stat.get('input', 'calc_code')
-    old_tot_struc = stat.getint('input', 'tot_struc')
-    old_nstage = stat.getint('input', 'nstage')
-    old_njob = stat.getint('input', 'njob')
-    old_jobcmd = stat.get('input', 'jobcmd')
-    old_jobfile = stat.get('input', 'jobfile')
+    old_algo = stat.get('basic', 'algo')
+    old_calc_code = stat.get('basic', 'calc_code')
+    old_tot_struc = stat.getint('basic', 'tot_struc')
+    old_nstage = stat.getint('basic', 'nstage')
+    old_njob = stat.getint('basic', 'njob')
+    old_jobcmd = stat.get('basic', 'jobcmd')
+    old_jobfile = stat.get('basic', 'jobfile')
 
     # ------ structure
-    old_struc_mode = stat.get('input', 'struc_mode')
-    old_natot = stat.getint('input', 'natot')
-    old_atype = stat.get('input', 'atype')
+    old_struc_mode = stat.get('structure', 'struc_mode')
+    old_natot = stat.getint('structure', 'natot')
+    old_atype = stat.get('structure', 'atype')
     old_atype = [a for a in old_atype.split()]    # list
-    old_nat = stat.get('input', 'nat')
+    old_nat = stat.get('structure', 'nat')
     old_nat = [int(x) for x in old_nat.split()]    # str --> int list
-    old_mol_file = stat.get('input', 'mol_file')
+    old_mol_file = stat.get('structure', 'mol_file')
     if old_mol_file == 'None':
         old_mol_file = None    # character --> None
     else:
         old_mol_file = [a for a in old_mol_file.split()]    # list
-    old_nmol = stat.get('input', 'nmol')
+    old_nmol = stat.get('structure', 'nmol')
     if old_nmol == 'None':
         old_nmol = None    # character --> None
     else:
         old_nmol = [int(x) for x in old_nmol.split()]    # str --> int list
-    old_timeout_mol = stat.getfloat('input', 'timeout_mol')
-    old_vol_factor = stat.get('input', 'vol_factor')
+    old_timeout_mol = stat.getfloat('structure', 'timeout_mol')
+    old_vol_factor = stat.get('structure', 'vol_factor')
     old_vol_factor = [float(x) for x in old_vol_factor.split()]    # str --> float list
-    old_vol_mu = stat.get('input', 'vol_mu')
+    old_vol_mu = stat.get('structure', 'vol_mu')
     if old_vol_mu == 'None':
         old_vol_mu = None    # character --> None
     else:
         old_vol_mu = float(old_vol_mu)    # character --> float
-    old_vol_sigma = stat.get('input', 'vol_sigma')
+    old_vol_sigma = stat.get('structure', 'vol_sigma')
     if old_vol_sigma == 'None':
         old_vol_sigma = None    # character --> None
     else:
         old_vol_sigma = float(old_vol_sigma)    # character --> float
-    old_maxcnt = stat.getint('input', 'maxcnt')
-    old_symprec = stat.getfloat('input', 'symprec')
-    old_spgnum = stat.get('input', 'spgnum')
-    if old_spgnum == '0':
-        old_spgnum = 0
-    elif not old_spgnum == 'all':
-        old_spgnum = [int(x) for x in old_spgnum.split()]    # int list
-    old_check_mindist = stat.getboolean('input', 'check_mindist')
-    old_use_find_wy = stat.getboolean('input', 'use_find_wy')
-    old_mindist = stat.get('input', 'mindist')
+    old_mindist = stat.get('structure', 'mindist')
     if old_mindist == 'None':
         old_mindist = None    # character --> None
     else:
         old_mindist = []
         for i in range(len(atype)):
-            tmp = stat.get('input', 'mindist_{}'.format(i+1))
+            tmp = stat.get('structure', 'mindist_{}'.format(i+1))
             tmp = [float(x) for x in tmp.split()]    # character --> float
             old_mindist.append(tmp)
-    old_minlen = stat.get('input', 'minlen')
+    old_maxcnt = stat.getint('structure', 'maxcnt')
+    old_symprec = stat.getfloat('structure', 'symprec')
+    old_spgnum = stat.get('structure', 'spgnum')
+    if old_spgnum == '0':
+        old_spgnum = 0
+    elif not old_spgnum == 'all':
+        old_spgnum = [int(x) for x in old_spgnum.split()]    # int list
+    old_use_find_wy = stat.getboolean('structure', 'use_find_wy')
+    old_minlen = stat.get('structure', 'minlen')
     if old_minlen == 'None':
         old_minlen = None    # character --> None
     else:
         old_minlen = float(old_minlen)    # character --> float
-    old_maxlen = stat.get('input', 'maxlen')
+    old_maxlen = stat.get('structure', 'maxlen')
     if old_maxlen == 'None':
         old_maxlen = None    # character --> None
     else:
         old_maxlen = float(old_maxlen)    # character --> float
-    old_dangle = stat.get('input', 'dangle')
+    old_dangle = stat.get('structure', 'dangle')
     if old_dangle == 'None':
         old_dangle = None    # character --> None
     else:
@@ -955,103 +951,104 @@ def diffinstat(stat):
 
     # ------ BO
     if old_algo == 'BO':
-        old_nselect_bo = stat.getint('input', 'nselect_bo')
-        old_score = stat.get('input', 'score')
-        old_num_rand_basis = stat.getint('input', 'num_rand_basis')
-        old_cdev = stat.getfloat('input', 'cdev')
-        old_dscrpt = stat.get('input', 'dscrpt')
-        old_fp_rmin = stat.getfloat('input', 'fp_rmin')
-        old_fp_rmax = stat.getfloat('input', 'fp_rmax')
-        old_fp_npoints = stat.getint('input', 'fp_npoints')
-        old_fp_sigma = stat.getfloat('input', 'fp_sigma')
-        old_max_select_bo = stat.getint('input', 'max_select_bo')
-        old_manual_select_bo = stat.get('input', 'manual_select_bo')
+        old_nselect_bo = stat.getint('BO', 'nselect_bo')
+        old_score = stat.get('BO', 'score')
+        old_num_rand_basis = stat.getint('BO', 'num_rand_basis')
+        old_cdev = stat.getfloat('BO', 'cdev')
+        old_dscrpt = stat.get('BO', 'dscrpt')
+        old_fp_rmin = stat.getfloat('BO', 'fp_rmin')
+        old_fp_rmax = stat.getfloat('BO', 'fp_rmax')
+        old_fp_npoints = stat.getint('BO', 'fp_npoints')
+        old_fp_sigma = stat.getfloat('BO', 'fp_sigma')
+        old_max_select_bo = stat.getint('BO', 'max_select_bo')
+        old_manual_select_bo = stat.get('BO', 'manual_select_bo')
         old_manual_select_bo = [int(x) for x in old_manual_select_bo.split()]
 
     # ------ LAQA
     if old_algo == 'LAQA':
-        old_nselect_laqa = stat.getint('input', 'nselect_laqa')
-        old_weight_laqa = stat.getfloat('input', 'weight_laqa')
+        old_nselect_laqa = stat.getint('LAQA', 'nselect_laqa')
+        old_weight_laqa = stat.getfloat('LAQA', 'weight_laqa')
 
     # ------ EA
     if old_algo == 'EA':
-        old_n_pop = stat.getint('input', 'n_pop')
-        old_n_crsov = stat.getint('input', 'n_crsov')
-        old_n_perm = stat.getint('input', 'n_perm')
-        old_n_strain = stat.getint('input', 'n_strain')
-        old_n_rand = stat.getint('input', 'n_rand')
-        old_n_elite = stat.getint('input', 'n_elite')
-        old_fit_reverse = stat.getboolean('input', 'fit_reverse')
-        old_n_fittest = stat.getint('input', 'n_fittest')
+        old_n_pop = stat.getint('EA', 'n_pop')
+        old_n_crsov = stat.getint('EA', 'n_crsov')
+        old_n_perm = stat.getint('EA', 'n_perm')
+        old_n_strain = stat.getint('EA', 'n_strain')
+        old_n_rand = stat.getint('EA', 'n_rand')
+        old_n_elite = stat.getint('EA', 'n_elite')
+        old_fit_reverse = stat.getboolean('EA', 'fit_reverse')
+        old_n_fittest = stat.getint('EA', 'n_fittest')
         old_mindist_ea = []
         for i in range(len(atype)):
-            tmp = stat.get('input', 'mindist_ea_{}'.format(i+1))
+            tmp = stat.get('EA', 'mindist_ea_{}'.format(i+1))
             tmp = [float(x) for x in tmp.split()]    # character --> float
             old_mindist_ea.append(tmp)
-        old_slct_func = stat.get('input', 'slct_func')
+        old_slct_func = stat.get('EA', 'slct_func')
         if old_slct_func == 'TNM':
-            old_t_size = stat.getint('input', 't_size')
+            old_t_size = stat.getint('EA', 't_size')
         elif old_slct_func == 'RLT':
-            old_a_rlt = stat.getfloat('input', 'a_rlt')
-            old_b_rlt = stat.getfloat('input', 'b_rlt')
-        old_crs_lat = stat.get('input', 'crs_lat')
-        old_nat_diff_tole = stat.getint('input', 'nat_diff_tole')
-        old_ntimes = stat.getint('input', 'ntimes')
-        old_sigma_st = stat.getfloat('input', 'sigma_st')
-        old_maxcnt_ea = stat.getint('input', 'maxcnt_ea')
-        old_maxgen_ea = stat.getint('input', 'maxgen_ea')
-        # old_restart_gen = stat.get('input', 'restart_gen')
+            old_a_rlt = stat.getfloat('EA', 'a_rlt')
+            old_b_rlt = stat.getfloat('EA', 'b_rlt')
+        old_crs_lat = stat.get('EA', 'crs_lat')
+        old_nat_diff_tole = stat.getint('EA', 'nat_diff_tole')
+        old_ntimes = stat.getint('EA', 'ntimes')
+        old_sigma_st = stat.getfloat('EA', 'sigma_st')
+        old_maxcnt_ea = stat.getint('EA', 'maxcnt_ea')
+        old_maxgen_ea = stat.getint('EA', 'maxgen_ea')
+        # old_restart_gen = stat.get('EA', 'restart_gen')
 
     # ------ VASP
     if old_calc_code == 'VASP':
-        old_kppvol = stat.get('input', 'kppvol')
+        old_kppvol = stat.get('VASP', 'kppvol')
         old_kppvol = [int(x) for x in old_kppvol.split()]    # int list
-        old_force_gamma = stat.getboolean('input', 'force_gamma')
+        old_force_gamma = stat.getboolean('VASP', 'force_gamma')
 
     # ------ QE
     if old_calc_code == 'QE':
-        old_qe_infile = stat.get('input', 'qe_infile')
-        old_qe_outfile = stat.get('input', 'qe_outfile')
-        old_kppvol = stat.get('input', 'kppvol')
+        old_qe_infile = stat.get('QE', 'qe_infile')
+        old_qe_outfile = stat.get('QE', 'qe_outfile')
+        old_kppvol = stat.get('QE', 'kppvol')
         old_kppvol = [int(x) for x in old_kppvol.split()]  # int list
-        old_force_gamma = stat.getboolean('input', 'force_gamma')
+        old_force_gamma = stat.getboolean('QE', 'force_gamma')
 
     if old_calc_code == 'OMX':
-        old_OMX_infile = stat.get('input', 'OMX_infile')
-        old_OMX_outfile = stat.get('input', 'OMX_outfile')
-        old_kppvol = stat.get('input', 'kppvol')
+        old_OMX_infile = stat.get('OMX', 'OMX_infile')
+        old_OMX_outfile = stat.get('OMX', 'OMX_outfile')
+        old_kppvol = stat.get('OMX', 'kppvol')
         old_kppvol = [int(x) for x in old_kppvol.split()]  # int list
-        old_force_gamma = stat.getboolean('input', 'force_gamma')
+        old_force_gamma = stat.getboolean('OMX', 'force_gamma')
 
     # ------ soiap
     if old_calc_code == 'soiap':
-        old_soiap_infile = stat.get('input', 'soiap_infile')
-        old_soiap_outfile = stat.get('input', 'soiap_outfile')
-        old_soiap_cif = stat.get('input', 'soiap_cif')
+        old_soiap_infile = stat.get('soiap', 'soiap_infile')
+        old_soiap_outfile = stat.get('soiap', 'soiap_outfile')
+        old_soiap_cif = stat.get('soiap', 'soiap_cif')
 
     # ------ lammps
     if old_calc_code == 'LAMMPS':
-        old_lammps_infile = stat.get('input', 'lammps_infile')
-        old_lammps_outfile = stat.get('input', 'lammps_outfile')
-        old_lammps_potential = stat.get('input', 'lammps_potential')
+        old_lammps_infile = stat.get('LAMMPS', 'lammps_infile')
+        old_lammps_outfile = stat.get('LAMMPS', 'lammps_outfile')
+        old_lammps_potential = stat.get('LAMMPS', 'lammps_potential')
         old_lammps_potential = old_lammps_potential.split()    # str --> list
         if old_lammps_potential == 'None':    # 'None' is just character here
             old_lammps_potential = None
-        old_lammps_data = stat.get('input', 'lammps_data')
+        old_lammps_data = stat.get('LAMMPS', 'lammps_data')
 
     # ------ option
-    old_stop_chkpt = stat.getint('input', 'stop_chkpt')
-    old_load_struc_flag = stat.getboolean('input', 'load_struc_flag')
-    old_stop_next_struc = stat.getboolean('input', 'stop_next_struc')
-    old_recalc = stat.get('input', 'recalc')
+    old_stop_chkpt = stat.getint('option', 'stop_chkpt')
+    old_load_struc_flag = stat.getboolean('option', 'load_struc_flag')
+    old_stop_next_struc = stat.getboolean('option', 'stop_next_struc')
+    old_recalc = stat.get('option', 'recalc')
     old_recalc = [int(x) for x in old_recalc.split()]    # int list
-    old_append_struc_ea = stat.getboolean('input', 'append_struc_ea')
-    old_energy_step_flag = stat.getboolean('input', 'energy_step_flag')
-    old_struc_step_flag = stat.getboolean('input', 'struc_step_flag')
-    old_fs_step_flag = stat.getboolean('input', 'fs_step_flag')
+    old_append_struc_ea = stat.getboolean('option', 'append_struc_ea')
+    old_energy_step_flag = stat.getboolean('option', 'energy_step_flag')
+    old_struc_step_flag = stat.getboolean('option', 'struc_step_flag')
+    old_fs_step_flag = stat.getboolean('option', 'fs_step_flag')
 
     # ---------- check difference
     # ------ basic
+    sec = 'basic'
     if not old_algo == algo:
         raise ValueError('Do not change algo')
     if not old_calc_code == calc_code:
@@ -1060,30 +1057,31 @@ def diffinstat(stat):
         if algo == 'EA':
             raise ValueError('Do not change tot_struc in EA')
         diff_out('tot_struc', old_tot_struc, tot_struc)
-        io_stat.set_input_common(stat, 'tot_struc', tot_struc)
+        io_stat.set_input_common(stat, sec, 'tot_struc', tot_struc)
         logic_change = True
     if not old_nstage == nstage:
         diff_out('nstage', old_nstage, nstage)
-        io_stat.set_input_common(stat, 'nstage', nstage)
+        io_stat.set_input_common(stat, sec, 'nstage', nstage)
         logic_change = True
     if not old_njob == njob:
         diff_out('njob', old_njob, njob)
-        io_stat.set_input_common(stat, 'njob', njob)
+        io_stat.set_input_common(stat, sec, 'njob', njob)
         logic_change = True
     if not old_jobcmd == jobcmd:
         diff_out('jobcmd', old_jobcmd, jobcmd)
-        io_stat.set_input_common(stat, 'jobcmd', jobcmd)
+        io_stat.set_input_common(stat, sec, 'jobcmd', jobcmd)
         logic_change = True
     if not old_jobfile == jobfile:
         diff_out('jobfile', old_jobfile, jobfile)
-        io_stat.set_input_common(stat, 'jobfile', jobfile)
+        io_stat.set_input_common(stat, sec, 'jobfile', jobfile)
         logic_change = True
 
     # ------ structure
+    sec = 'structure'
     if not old_struc_mode == struc_mode:
         if old_struc_mode in ['crystal', 'mol'] and struc_mode in ['crystal', 'mol']:
             diff_out('struc_mode', old_struc_mode, struc_mode)
-            io_stat.set_input_common(stat, 'struc_mode', struc_mode)
+            io_stat.set_input_common(stat, sec, 'struc_mode', struc_mode)
             logic_change = True
         else:
             raise ValueError('Do not change struc_mode except for crystal <--> mol')
@@ -1095,107 +1093,104 @@ def diffinstat(stat):
         raise ValueError('Do not change nat')
     if not old_mol_file == mol_file:
         diff_out('mol_file', old_mol_file, mol_file)
-        io_stat.set_input_common(stat, 'mol_file', mol_file)
+        io_stat.set_input_common(stat, sec, 'mol_file', mol_file)
         logic_change = True
     if not old_nmol == nmol:
         if old_nmol is None or nmol is None:
             diff_out('nmol', old_nmol, nmol)
-            io_stat.set_input_common(stat, 'nmol', nmol)
+            io_stat.set_input_common(stat, sec, 'nmol', nmol)
             logic_change = True
         else:
             raise ValueError('Do not change nmol except for None')
     if not old_timeout_mol == timeout_mol:
         diff_out('timeout_mol', old_timeout_mol, timeout_mol)
-        io_stat.set_input_common(stat, 'timeout_mol', timeout_mol)
+        io_stat.set_input_common(stat, sec, 'timeout_mol', timeout_mol)
         logic_change = True
     if not old_vol_factor == vol_factor:
         diff_out('vol_factor', old_vol_factor, vol_factor)
-        io_stat.set_input_common(stat, 'vol_factor', '{}'.format(
+        io_stat.set_input_common(stat, sec, 'vol_factor', '{}'.format(
                 ' '.join(str(x) for x in vol_factor)))
         logic_change = True
     if not old_vol_mu == vol_mu:
         diff_out('vol_mu', old_vol_mu, vol_mu)
-        io_stat.set_input_common(stat, 'vol_mu', vol_mu)
+        io_stat.set_input_common(stat, sec, 'vol_mu', vol_mu)
         logic_change = True
     if not old_vol_sigma == vol_sigma:
         diff_out('vol_sigma', old_vol_sigma, vol_sigma)
-        io_stat.set_input_common(stat, 'vol_sigma', vol_sigma)
-        logic_change = True
-    if not old_maxcnt == maxcnt:
-        diff_out('maxcnt', old_maxcnt, maxcnt)
-        io_stat.set_input_common(stat, 'maxcnt', maxcnt)
-        logic_change = True
-    if not old_symprec == symprec:
-        diff_out('symprec', old_symprec, symprec)
-        io_stat.set_input_common(stat, 'symprec', symprec)
-        logic_change = True
-    if not old_spgnum == spgnum:
-        diff_out('spgnum', old_spgnum, spgnum)
-        if spgnum == 0 or spgnum == 'all':
-            io_stat.set_input_common(stat, 'spgnum', spgnum)
-        else:
-            io_stat.set_input_common(stat, 'spgnum', '{}'.format(
-                ' '.join(str(x) for x in spgnum)))
-        logic_change = True
-    if not old_check_mindist == check_mindist:
-        diff_out('check_mindist', old_check_mindist, check_mindist)
-        io_stat.set_input_common(stat, 'check_mindist', check_mindist)
-        logic_change = True
-    if not old_use_find_wy == use_find_wy:
-        diff_out('use_find_wy', old_use_find_wy, use_find_wy)
-        io_stat.set_input_common(stat, 'use_find_wy', use_find_wy)
+        io_stat.set_input_common(stat, sec, 'vol_sigma', vol_sigma)
         logic_change = True
     if not old_mindist == mindist:
         diff_out('mindist', old_mindist, mindist)
         # -- case: old_mindist = None, mindist = []
         if old_mindist is None:
-            stat.remove_option('input', 'mindist')    # clear mindist
+            stat.remove_option('structure', 'mindist')    # clear mindist
             for i in range(len(atype)):               # add mindist_?
-                io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
+                io_stat.set_input_common(stat, sec, 'mindist_{}'.format(i+1),
                                          '{}'.format(' '.join(
                                              str(x) for x in mindist[i])))
         # -- case: old_mindist = [], mindist = None
         elif mindist is None:
             for i in range(len(atype)):    # clear mindist_?
-                stat.remove_option('input', 'mindist_{}'.format(i+1))
-            io_stat.set_input_common(stat, 'mindist', mindist)    # add mindist
+                stat.remove_option('structure', 'mindist_{}'.format(i+1))
+            io_stat.set_input_common(stat, sec, 'mindist', mindist)    # add mindist
         # -- case: old_mindist = [], mindist = [], update list
         else:
             for i in range(len(atype)):
-                io_stat.set_input_common(stat, 'mindist_{}'.format(i+1),
+                io_stat.set_input_common(stat, sec, 'mindist_{}'.format(i+1),
                                          '{}'.format(' '.join(
                                              str(x) for x in mindist[i])))
         logic_change = True
+    if not old_maxcnt == maxcnt:
+        diff_out('maxcnt', old_maxcnt, maxcnt)
+        io_stat.set_input_common(stat, sec, 'maxcnt', maxcnt)
+        logic_change = True
+    if not old_symprec == symprec:
+        diff_out('symprec', old_symprec, symprec)
+        io_stat.set_input_common(stat, sec, 'symprec', symprec)
+        logic_change = True
+    if not old_spgnum == spgnum:
+        diff_out('spgnum', old_spgnum, spgnum)
+        if spgnum == 0 or spgnum == 'all':
+            io_stat.set_input_common(stat, sec, 'spgnum', spgnum)
+        else:
+            io_stat.set_input_common(stat, sec, 'spgnum', '{}'.format(
+                ' '.join(str(x) for x in spgnum)))
+        logic_change = True
+    if not old_use_find_wy == use_find_wy:
+        diff_out('use_find_wy', old_use_find_wy, use_find_wy)
+        io_stat.set_input_common(stat, sec, 'use_find_wy', use_find_wy)
+        logic_change = True
     if not old_minlen == minlen:
         diff_out('minlen', old_minlen, minlen)
-        io_stat.set_input_common(stat, 'minlen', minlen)
+        io_stat.set_input_common(stat, sec, 'minlen', minlen)
         logic_change = True
     if not old_maxlen == maxlen:
         diff_out('maxlen', old_maxlen, maxlen)
-        io_stat.set_input_common(stat, 'maxlen', maxlen)
+        io_stat.set_input_common(stat, sec, 'maxlen', maxlen)
         logic_change = True
     if not old_dangle == dangle:
         diff_out('dangle', old_dangle, dangle)
-        io_stat.set_input_common(stat, 'dangle', dangle)
+        io_stat.set_input_common(stat, sec, 'dangle', dangle)
         logic_change = True
 
     # ------ BO
+    sec = 'BO'
     if algo == 'BO':
         if not old_nselect_bo == nselect_bo:
             diff_out('nselect_bo', old_nselect_bo, nselect_bo)
-            io_stat.set_input_common(stat, 'nselect_bo', nselect_bo)
+            io_stat.set_input_common(stat, sec, 'nselect_bo', nselect_bo)
             logic_change = True
         if not old_score == score:
             diff_out('score', old_score, score)
-            io_stat.set_input_common(stat, 'score', score)
+            io_stat.set_input_common(stat, sec, 'score', score)
             logic_change = True
         if not old_num_rand_basis == num_rand_basis:
             diff_out('num_rand_basis', old_num_rand_basis, num_rand_basis)
-            io_stat.set_input_common(stat, 'num_rand_basis', num_rand_basis)
+            io_stat.set_input_common(stat, sec, 'num_rand_basis', num_rand_basis)
             logic_change = True
         if not old_cdev == cdev:
             diff_out('cdev', old_cdev, cdev)
-            io_stat.set_input_common(stat, 'cdev', cdev)
+            io_stat.set_input_common(stat, sec, 'cdev', cdev)
             logic_change = True
         if not old_dscrpt == dscrpt:
             raise ValueError('Do not change dscrpt')
@@ -1209,122 +1204,126 @@ def diffinstat(stat):
             raise ValueError('Do not change fp_sigma')
         if not old_max_select_bo == max_select_bo:
             diff_out('max_select_bo', old_max_select_bo, max_select_bo)
-            io_stat.set_input_common(stat, 'max_select_bo', max_select_bo)
+            io_stat.set_input_common(stat, sec, 'max_select_bo', max_select_bo)
             logic_change = True
         if not old_manual_select_bo == manual_select_bo:
             diff_out('manual_select_bo', old_manual_select_bo,
                      manual_select_bo)
-            io_stat.set_input_common(stat, 'manual_select_bo',
+            io_stat.set_input_common(stat, sec, 'manual_select_bo',
                                      '{}'.format(' '.join(
                                          str(x) for x in manual_select_bo)))
             logic_change = True
 
     # ------ LAQA
+    sec = 'LAQA'
     if algo == 'LAQA':
         if not old_nselect_laqa == nselect_laqa:
             diff_out('nselect_laqa', old_nselect_laqa, nselect_laqa)
-            io_stat.set_input_common(stat, 'nselect_laqa', nselect_laqa)
+            io_stat.set_input_common(stat, sec, 'nselect_laqa', nselect_laqa)
             logic_change = True
         if not old_weight_laqa == weight_laqa:
             diff_out('weight_laqa', old_weight_laqa, weight_laqa)
-            io_stat.set_input_common(stat, 'weight_laqa', weight_laqa)
+            io_stat.set_input_common(stat, sec, 'weight_laqa', weight_laqa)
             logic_change = True
 
     # ------ EA
+    sec = 'EA'
     if algo == 'EA':
         if not old_n_pop == n_pop:
             diff_out('n_pop', old_n_pop, n_pop)
-            io_stat.set_input_common(stat, 'n_pop', n_pop)
+            io_stat.set_input_common(stat, sec, 'n_pop', n_pop)
             logic_change = True
         if not old_n_crsov == n_crsov:
             diff_out('n_crsov', old_n_crsov, n_crsov)
-            io_stat.set_input_common(stat, 'n_crsov', n_crsov)
+            io_stat.set_input_common(stat, sec, 'n_crsov', n_crsov)
             logic_change = True
         if not old_n_perm == n_perm:
             diff_out('n_perm', old_n_perm, n_perm)
-            io_stat.set_input_common(stat, 'n_perm', n_perm)
+            io_stat.set_input_common(stat, sec, 'n_perm', n_perm)
             logic_change = True
         if not old_n_strain == n_strain:
             diff_out('n_strain', old_n_strain, n_strain)
-            io_stat.set_input_common(stat, 'n_strain', n_strain)
+            io_stat.set_input_common(stat, sec, 'n_strain', n_strain)
             logic_change = True
         if not old_n_rand == n_rand:
             diff_out('n_rand', old_n_rand, n_rand)
-            io_stat.set_input_common(stat, 'n_rand', n_rand)
+            io_stat.set_input_common(stat, sec, 'n_rand', n_rand)
             logic_change = True
         if not old_n_elite == n_elite:
             diff_out('n_elite', old_n_elite, n_elite)
-            io_stat.set_input_common(stat, 'n_elite', n_elite)
+            io_stat.set_input_common(stat, sec, 'n_elite', n_elite)
             logic_change = True
         if not old_fit_reverse == fit_reverse:
             raise ValueError('Do not change fit_reverse')
         if not old_n_fittest == n_fittest:
             diff_out('n_fittest', old_n_fittest, n_fittest)
-            io_stat.set_input_common(stat, 'n_fittest', n_fittest)
+            io_stat.set_input_common(stat, sec, 'n_fittest', n_fittest)
             logic_change = True
         if not old_mindist_ea == mindist_ea:
             diff_out('mindist_ea', old_mindist_ea, mindist_ea)
             for i in range(len(atype)):
-                io_stat.set_input_common(stat, 'mindist_ea_{}'.format(i+1),
+                io_stat.set_input_common(stat, sec, 'mindist_ea_{}'.format(i+1),
                                          '{}'.format(' '.join(
                                              str(x) for x in mindist_ea[i])))
             logic_change = True
         if not old_slct_func == slct_func:
             diff_out('slct_func', old_slct_func, slct_func)
-            io_stat.set_input_common(stat, 'slct_func', slct_func)
+            io_stat.set_input_common(stat, sec, 'slct_func', slct_func)
             logic_change = True
         if old_slct_func == 'TNM' and slct_func == 'TNM':
             if not old_t_size == t_size:
                 diff_out('t_size', old_t_size, t_size)
-                io_stat.set_input_common(stat, 't_size', t_size)
+                io_stat.set_input_common(stat, sec, 't_size', t_size)
                 logic_change = True
         elif old_slct_func == 'RLT' and slct_func == 'RLT':
             if not old_a_rlt == a_rlt:
                 diff_out('a_rlt', old_a_rlt, a_rlt)
-                io_stat.set_input_common(stat, 'a_rlt', a_rlt)
+                io_stat.set_input_common(stat, sec, 'a_rlt', a_rlt)
                 logic_change = True
             if not old_b_rlt == b_rlt:
                 diff_out('b_rlt', old_b_rlt, b_rlt)
-                io_stat.set_input_common(stat, 'b_rlt', b_rlt)
+                io_stat.set_input_common(stat, sec, 'b_rlt', b_rlt)
                 logic_change = True
         if not old_crs_lat == crs_lat:
             diff_out('crs_lat', old_crs_lat, crs_lat)
-            io_stat.set_input_common(stat, 'crs_lat', crs_lat)
+            io_stat.set_input_common(stat, sec, 'crs_lat', crs_lat)
             logic_change = True
         if not old_nat_diff_tole == nat_diff_tole:
             diff_out('nat_diff_tole', old_nat_diff_tole, nat_diff_tole)
-            io_stat.set_input_common(stat, 'nat_diff_tole', nat_diff_tole)
+            io_stat.set_input_common(stat, sec, 'nat_diff_tole', nat_diff_tole)
             logic_change = True
         if not old_ntimes == ntimes:
             diff_out('ntimes', old_ntimes, ntimes)
-            io_stat.set_input_common(stat, 'ntimes', ntimes)
+            io_stat.set_input_common(stat, sec, 'ntimes', ntimes)
             logic_change = True
         if not old_sigma_st == sigma_st:
             diff_out('sigma_st', old_sigma_st, sigma_st)
-            io_stat.set_input_common(stat, 'sigma_st', sigma_st)
+            io_stat.set_input_common(stat, sec, 'sigma_st', sigma_st)
             logic_change = True
         if not old_maxcnt_ea == maxcnt_ea:
             diff_out('maxcnt_ea', old_maxcnt_ea, maxcnt_ea)
-            io_stat.set_input_common(stat, 'maxcnt_ea', maxcnt_ea)
+            io_stat.set_input_common(stat, sec, 'maxcnt_ea', maxcnt_ea)
             logic_change = True
         if not old_maxgen_ea == maxgen_ea:
             diff_out('maxgen_ea', old_maxgen_ea, maxgen_ea)
-            io_stat.set_input_common(stat, 'maxgen_ea', maxgen_ea)
+            io_stat.set_input_common(stat, sec, 'maxgen_ea', maxgen_ea)
             logic_change = True
 
     # ------ VASP
+    sec = 'VASP'
     if calc_code == 'VASP':
         if not old_kppvol == kppvol:
             diff_out('kppvol', old_kppvol, kppvol)
-            io_stat.set_input_common(stat, 'kppvol', '{}'.format(
+            io_stat.set_input_common(stat, sec, 'kppvol', '{}'.format(
                 ' '.join(str(x) for x in kppvol)))
             logic_change = True
         if not old_force_gamma == force_gamma:
             diff_out('force_gamma', old_force_gamma, force_gamma)
-            io_stat.set_input_common(stat, 'force_gamma', force_gamma)
+            io_stat.set_input_common(stat, sec, 'force_gamma', force_gamma)
             logic_change = True
 
     # ------ QE
+    sec = 'QE'
     if calc_code == 'QE':
         if not old_qe_infile == qe_infile:
             raise ValueError('Do not change qe_infile')
@@ -1332,14 +1331,15 @@ def diffinstat(stat):
             raise ValueError('Do not change qe_outfile')
         if not old_kppvol == kppvol:
             diff_out('kppvol', old_kppvol, kppvol)
-            io_stat.set_input_common(stat, 'kppvol', '{}'.format(
+            io_stat.set_input_common(stat, sec, 'kppvol', '{}'.format(
                 ' '.join(str(x) for x in kppvol)))
             logic_change = True
         if not old_force_gamma == force_gamma:
             diff_out('force_gamma', old_force_gamma, force_gamma)
-            io_stat.set_input_common(stat, 'force_gamma', force_gamma)
+            io_stat.set_input_common(stat, sec, 'force_gamma', force_gamma)
             logic_change = True
     # ------ OMX
+    sec = 'OMX'
     if calc_code == 'OMX':
         if not old_OMX_infile == OMX_infile:
             raise ValueError('Do not change OMX_infile')
@@ -1347,15 +1347,16 @@ def diffinstat(stat):
             raise ValueError('Do not change OMX_outfile')
         if not old_kppvol == kppvol:
             diff_out('kppvol', old_kppvol, kppvol)
-            io_stat.set_input_common(stat, 'kppvol', '{}'.format(
+            io_stat.set_input_common(stat, sec, 'kppvol', '{}'.format(
                 ' '.join(str(x) for x in kppvol)))
             logic_change = True
         if not old_force_gamma == force_gamma:
             diff_out('force_gamma', old_force_gamma, force_gamma)
-            io_stat.set_input_common(stat, 'force_gamma', force_gamma)
+            io_stat.set_input_common(stat, sec, 'force_gamma', force_gamma)
             logic_change = True
 
     # ------ soiap
+    sec = 'soiap'
     if calc_code == 'soiap':
         if not old_soiap_infile == soiap_infile:
             raise ValueError('Do not change soiap_infile')
@@ -1365,6 +1366,7 @@ def diffinstat(stat):
             raise ValueError('Do not change soiap_cif')
 
     # ------ lammps
+    sec = 'LAMMPS'
     if calc_code == 'LAMMPS':
         if not old_lammps_infile == lammps_infile:
             raise ValueError('Do not change lammps_infile')
@@ -1376,26 +1378,27 @@ def diffinstat(stat):
             raise ValueError('Do not change lammps_data')
 
     # ------ option
+    sec = 'option'
     if not old_stop_chkpt == stop_chkpt:
         diff_out('stop_chkpt', old_stop_chkpt, stop_chkpt)
-        io_stat.set_input_common(stat, 'stop_chkpt', stop_chkpt)
+        io_stat.set_input_common(stat, sec, 'stop_chkpt', stop_chkpt)
         logic_change = True
     if not old_load_struc_flag == load_struc_flag:
         diff_out('load_struc_flag', old_load_struc_flag, load_struc_flag)
-        io_stat.set_input_common(stat, 'load_struc_flag', load_struc_flag)
+        io_stat.set_input_common(stat, sec, 'load_struc_flag', load_struc_flag)
         logic_change = True
     if not old_stop_next_struc == stop_next_struc:
         diff_out('stop_next_struc', old_stop_next_struc, stop_next_struc)
-        io_stat.set_input_common(stat, 'stop_next_struc', stop_next_struc)
+        io_stat.set_input_common(stat, sec, 'stop_next_struc', stop_next_struc)
         logic_change = True
     if not old_recalc == recalc:
         diff_out('recalc', old_recalc, recalc)
-        io_stat.set_input_common(stat, 'recalc', '{}'.format(
+        io_stat.set_input_common(stat, sec, 'recalc', '{}'.format(
             ' '.join(str(x) for x in recalc)))
         logic_change = True
     if not old_append_struc_ea == append_struc_ea:
         diff_out('append_struc_ea', old_append_struc_ea, append_struc_ea)
-        io_stat.set_input_common(stat, 'append_struc_ea', append_struc_ea)
+        io_stat.set_input_common(stat, sec, 'append_struc_ea', append_struc_ea)
         logic_change = True
     if not old_energy_step_flag == energy_step_flag:
         raise ValueError('Do not change energy_step_flag')

@@ -7,6 +7,7 @@ import math
 import os
 import random
 import subprocess
+import sys
 
 import numpy as np
 from pymatgen import Structure
@@ -156,7 +157,14 @@ class Rnd_struc_gen:
                 if self.vol_mu is not None:
                     vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
                     tmp_struc.scale_lattice(volume=vol)
-                    if not check_distance(tmp_struc, self.atype, self.mindist):
+                    success, mindist_ij, dist = check_distance(tmp_struc,
+                                                               self.atype,
+                                                               self.mindist)
+                    if not success:
+                        sys.stderr.write('mindist in gen_wo_spg: {} - {}, {}. retry.\n'.format(
+                            self.atype[mindist_ij[0]],
+                            self.atype[mindist_ij[1]],
+                            dist))
                         continue    # failure
                 # --
                 # ------ check actual space group using pymatgen
@@ -261,7 +269,14 @@ class Rnd_struc_gen:
             if self.vol_mu is not None:
                 vol = random.gauss(mu=self.vol_mu, sigma=self.vol_sigma)
                 tmp_struc.scale_lattice(volume=vol)
-                if not check_distance(tmp_struc, self.atype, self.mindist):
+                success, mindist_ij, dist = check_distance(tmp_struc,
+                                                           self.atype,
+                                                           self.mindist)
+                if not success:
+                    sys.stderr.write('mindist in gen_with_find_wy: {} - {}, {}. retry.\n'.format(
+                        self.atype[mindist_ij[0]],
+                        self.atype[mindist_ij[1]],
+                        dist))
                     continue    # failure
             # ------ check actual space group using pymatgen
             try:
@@ -437,7 +452,14 @@ class Rnd_struc_gen:
             tmp_struc = Structure([self.va, self.vb, self.vc],
                                   self.atomlist[:len(incoord)],
                                   incoord)
-            if not check_distance(tmp_struc, self.atype, self.mindist):
+            success, mindist_ij, dist = check_distance(tmp_struc,
+                                                       self.atype,
+                                                       self.mindist)
+            if not success:
+                sys.stderr.write('mindist in _gen_struc_wo_spg: {} - {}, {}. retry.\n'.format(
+                    self.atype[mindist_ij[0]],
+                    self.atype[mindist_ij[1]],
+                    dist))
                 incoord.pop(-1)    # cancel
                 cnt += 1
                 if self.maxcnt < cnt:
@@ -507,7 +529,14 @@ class Rnd_struc_gen:
                 # -- check minimum distance
                 spgstruc = Structure(plat, atomnames, cart,
                                      coords_are_cartesian=True)
-                if not check_distance(spgstruc, self.atype, self.mindist):
+                success, mindist_ij, dist = check_distance(spgstruc,
+                                                           self.atype,
+                                                           self.mindist)
+                if not success:
+                    sys.stderr.write('mindist in _gen_struc_with_spg: {} - {}, {}. retry.\n'.format(
+                        self.atype[mindist_ij[0]],
+                        self.atype[mindist_ij[1]],
+                        dist))
                     # failure
                     # num_uniqvar = 0 --> value == 0
                     cnt = self.maxcnt + 1 if value == 0 else cnt + 1

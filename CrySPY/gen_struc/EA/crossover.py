@@ -3,6 +3,7 @@ Crossover class
 '''
 
 from collections import Counter
+import sys
 
 import numpy as np
 from pymatgen import Structure, Lattice
@@ -288,10 +289,17 @@ class Crossover:
                 coords[self._axis] = np.random.normal(loc=self._mean,
                                                       scale=0.08)
                 self.child.append(species=self.atype[i], coords=coords)
-                if check_distance(self.child, self.atype, self.mindist):
+                success, mindist_ij, dist = check_distance(self.child,
+                                                           self.atype,
+                                                           self.mindist)
+                if success:
                     cnt = 0    # reset
                     self._nat_diff[i] += 1
                 else:
+                    sys.stderr.write('mindist in _add_border_line: {} - {}, {}. retry.\n'.format(
+                        self.atype[mindist_ij[0]],
+                        self.atype[mindist_ij[1]],
+                        dist))
                     self.child.pop()    # cancel
                 # ------ fail
                 if cnt == self.maxcnt_ea:
