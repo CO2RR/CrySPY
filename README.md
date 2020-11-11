@@ -1,7 +1,8 @@
 ![cryspy_logo](./docs/_images/cryspy_fix-03.png)
 
 # CrySPY
-CrySPY is a crystal structure prediction tool written in Python.
+CrySPY is a crystal structure prediction tool written in Python.  
+Document site is moved to https://tomoki-yamashita.github.io/CrySPY_doc/
 
 ## Latest version
 version 0.9.0 (2020 ???? ??)
@@ -9,9 +10,20 @@ version 0.9.0 (2020 ???? ??)
 ## Important changes
 * version 0.9.0
     - Interfaced with OpenMX
-    - PyXtal is required
-    - New structure-generation mode using PyXtal
-        + Molecular crystal
+    - Employ PyXtal library to generate initial structures
+    - If you use PyXtal (default), find_wy program is not required
+    - LAQA can be used with soiap
+    - Change the section name in the input file: [lattice] section –> [structure] section
+    - Several input variables move to [structure] section
+        + natot: [basic] –> [structure]
+        + atype: [basic] –> [structure]
+        + nat: [basic] –> [structure]
+        + maxcnt: [option] –> [structure]
+        + symprec: [option] –> [structure]
+        + spgnum: [option] –> [structure]
+    - New features
+        + Molecular crystal structure generation
+        + Scale volume
 * version 0.8.0
     - Migrated to Python 3
     - Several variable names
@@ -30,12 +42,10 @@ version 0.9.0 (2020 ???? ??)
 ### Python
 - Python 3.x.x
 - [COMBO](https://github.com/tsudalab/combo3 "COMBO")
-- numpy
-- pandas
 - [pymatgen](http://pymatgen.org "pymatgen")
 - [PyXtal](https://pyxtal.readthedocs.io/en/latest "PyXtal")
 
-Tested with Python 3.7.5 on Mac and Python 3.6.7 (miniconda3-4.3.30) on Linux (super computer).
+Tested with Python 3.8.5 on Mac and Python 3.8.2, 3.8.3 on Linux.
 
 ### Structure optimizer
 At least one optimizer is required.

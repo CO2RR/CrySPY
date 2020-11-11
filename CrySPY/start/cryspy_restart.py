@@ -94,6 +94,13 @@ def append_struc(init_struc_data):
             rsgx.gen_struc_mol(nstruc=nstruc, id_offset=id_offset,
                                init_pos_path='./data/init_POSCARS',
                                timeout_mol=rin.timeout_mol)
+        # ------ molecular crystal breaking symmetry
+        elif rin.struc_mode == 'mol_bs':
+            rsgx.set_mol(mol_file=rin.mol_file, nmol=rin.nmol)
+            rsgx.gen_struc_mol_break_sym(nstruc=nstruc,
+                                         rot_mol=rin.rot_mol,
+                                         id_offset=id_offset,
+                                         init_pos_path='./data/init_POSCARS')
         # ------ update
         init_struc_data.update(rsgx.init_struc_data)
     # ---------- Rnd_struc_gen

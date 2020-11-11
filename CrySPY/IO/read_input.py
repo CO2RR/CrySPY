@@ -20,16 +20,16 @@ def readin():
     global algo, calc_code, tot_struc
     global nstage, njob, jobcmd, jobfile
     # ------ read intput variables
-    algo = config.get('basic', 'algo')
-    if algo not in ['RS', 'BO', 'LAQA', 'EA']:
-        raise NotImplementedError('algo must be RS, BO, LAQA, or EA')
     calc_code = config.get('basic', 'calc_code')
-    if algo == 'LAQA':
-        if not calc_code == 'VASP':
-            raise NotImplementedError('LAQA: only VASP for now')
     if calc_code not in ['VASP', 'QE', 'soiap', 'LAMMPS', 'OMX']:
         raise NotImplementedError(
             'calc_code must be VASP, QE, OMX, soiap, or LAMMPS')
+    algo = config.get('basic', 'algo')
+    if algo not in ['RS', 'BO', 'LAQA', 'EA']:
+        raise NotImplementedError('algo must be RS, BO, LAQA, or EA')
+    if algo == 'LAQA':
+        if calc_code in ['QE', 'LAMMPS']:
+            raise NotImplementedError('LAQA: only VASP or soiap for now')
     tot_struc = config.getint('basic', 'tot_struc')
     if tot_struc <= 0:
         raise ValueError('tot_struc <= 0, check tot_struc')
@@ -47,7 +47,8 @@ def readin():
 
     # ---------- structure
     # ------ global declaration
-    global struc_mode, natot, atype, nat, mol_file, nmol, timeout_mol
+    global struc_mode, natot, atype, nat
+    global mol_file, nmol, timeout_mol, rot_mol
     global vol_factor, vol_mu, vol_sigma, mindist
     global maxcnt, symprec, spgnum, use_find_wy
     global minlen, maxlen, dangle
@@ -57,7 +58,7 @@ def readin():
         struc_mode = config.get('structure', 'struc_mode')
     except (configparser.NoOptionError, configparser.NoSectionError):
         struc_mode = 'crystal'
-    if struc_mode not in ['crystal', 'mol', 'host']:
+    if struc_mode not in ['crystal', 'mol', 'mol_bs', 'host']:
         raise ValueError('struc_mode is wrong')
     natot = config.getint('structure', 'natot')
     if natot <= 0:
@@ -71,7 +72,7 @@ def readin():
     if not sum(nat) == natot:
         raise ValueError('not sum(nat) == natot, check natot and nat')
     # -- mol
-    if struc_mode == 'mol':
+    if struc_mode in ['mol', 'mol_bs']:
         mol_file = config.get('structure', 'mol_file')
         mol_file = [a for a in mol_file.split()]    # list
         nmol = config.get('structure', 'nmol')
@@ -81,13 +82,23 @@ def readin():
         try:
             timeout_mol = config.getfloat('structure', 'timeout_mol')
         except (configparser.NoOptionError, configparser.NoSectionError):
-            timeout_mol = 180.0
+            timeout_mol = 120.0
         if timeout_mol <= 0:
             raise ValueError('timeout_mol must be positive')
+        if struc_mode == 'mol_bs':
+            try:
+                rot_mol = config.get('structure', 'rot_mol')
+            except (configparser.NoOptionError, configparser.NoSectionError):
+                rot_mol = 'random_wyckoff'
+            if rot_mol not in ['random', 'random_mol', 'random_wyckoff']:
+                raise ValueError('rot_mol is wrong')
+        else:
+            rot_mol = None
     else:
         mol_file = None
         nmol = None
-        timeout_mol = 60.0
+        timeout_mol = 120.0
+        rot_mol = None
     # -- volume
     try:
         vol_mu = config.getfloat('structure', 'vol_mu')
@@ -105,8 +116,8 @@ def readin():
             raise ValueError("check vol_mu: {} and vol_sigma: {}".format(
                 vol_mu, vol_sigma))
     if vol_sigma is not None:
-        if vol_sigma <= 0.0:
-            raise ValueError('vol_mu must be positive float')
+        if vol_sigma < 0.0:
+            raise ValueError('vol_sigma must not be negative')
     try:
         vol_factor = config.get('structure', 'vol_factor')
         vol_factor = [float(x) for x in vol_factor.split()]    # char --> float
@@ -195,7 +206,8 @@ def readin():
     global stop_chkpt
     global load_struc_flag, stop_next_struc, recalc
     global append_struc_ea
-    global energy_step_flag, struc_step_flag, fs_step_flag
+    global energy_step_flag, struc_step_flag
+    global force_step_flag, stress_step_flag
 
     # ------ read intput variables
     try:
@@ -239,14 +251,23 @@ def readin():
     except (configparser.NoOptionError, configparser.NoSectionError):
         struc_step_flag = False
     try:
-        fs_step_flag = config.getboolean('option', 'fs_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
-            fs_step_flag = False
+        force_step_flag = config.getboolean('option', 'force_step_flag')
+        # -- only VASP or soiap for now
+        if calc_code in ['QE', 'LAMMPS']:
+            force_step_flag = False
     except (configparser.NoOptionError, configparser.NoSectionError):
-        fs_step_flag = False
+        force_step_flag = False
     if algo == 'LAQA':
-        fs_step_flag = True
+        force_step_flag = True
+    try:
+        stress_step_flag = config.getboolean('option', 'stress_step_flag')
+        # -- only VASP or soiap for now
+        if calc_code in ['QE', 'LAMMPS']:
+            stress_step_flag = False
+    except (configparser.NoOptionError, configparser.NoSectionError):
+        stress_step_flag = False
+    if algo == 'LAQA':
+        stress_step_flag = True
 
     # ---------- BO
     if algo == 'BO':
@@ -606,6 +627,7 @@ def writeout():
         else:
             fout.write('nmol = {}\n'.format(' '.join(str(b) for b in nmol)))
         fout.write('timeout_mol = {}\n'.format(timeout_mol))
+        fout.write('rot_mol = {}\n'.format(rot_mol))
         fout.write('vol_factor = {}\n'.format(' '.join(str(b) for b in vol_factor)))
         fout.write('vol_mu = {}\n'.format(vol_mu))
         fout.write('vol_sigma = {}\n'.format(vol_sigma))
@@ -727,7 +749,8 @@ def writeout():
         fout.write('append_struc_ea = {}\n'.format(append_struc_ea))
         fout.write('energy_step_flag = {}\n'.format(energy_step_flag))
         fout.write('struc_step_flag = {}\n'.format(struc_step_flag))
-        fout.write('fs_step_flag = {}\n'.format(fs_step_flag))
+        fout.write('force_step_flag = {}\n'.format(force_step_flag))
+        fout.write('stress_step_flag = {}\n'.format(stress_step_flag))
         fout.write('\n\n')
 
 
@@ -756,6 +779,7 @@ def save_stat(stat):    # only 1st run
     else:
         stat.set('structure', 'nmol', '{}'.format(' '.join(str(b) for b in nmol)))
     stat.set('structure', 'timeout_mol', '{}'.format(timeout_mol))
+    stat.set('structure', 'rot_mol', '{}'.format(rot_mol))
     stat.set('structure', 'vol_factor', '{}'.format(' '.join(str(b) for b in vol_factor)))
     stat.set('structure', 'vol_mu', '{}'.format(vol_mu))
     stat.set('structure', 'vol_sigma', '{}'.format(vol_sigma))
@@ -867,7 +891,8 @@ def save_stat(stat):    # only 1st run
     stat.set('option', 'append_struc_ea', '{}'.format(append_struc_ea))
     stat.set('option', 'energy_step_flag', '{}'.format(energy_step_flag))
     stat.set('option', 'struc_step_flag', '{}'.format(struc_step_flag))
-    stat.set('option', 'fs_step_flag', '{}'.format(fs_step_flag))
+    stat.set('option', 'force_step_flag', '{}'.format(force_step_flag))
+    stat.set('option', 'stress_step_flag', '{}'.format(stress_step_flag))
 
     # ---------- write stat
     io_stat.write_stat(stat)
@@ -904,6 +929,9 @@ def diffinstat(stat):
     else:
         old_nmol = [int(x) for x in old_nmol.split()]    # str --> int list
     old_timeout_mol = stat.getfloat('structure', 'timeout_mol')
+    old_rot_mol = stat.get('structure', 'rot_mol')
+    if old_rot_mol == 'None':
+        old_rot_mol = None    # character --> None
     old_vol_factor = stat.get('structure', 'vol_factor')
     old_vol_factor = [float(x) for x in old_vol_factor.split()]    # str --> float list
     old_vol_mu = stat.get('structure', 'vol_mu')
@@ -916,10 +944,11 @@ def diffinstat(stat):
         old_vol_sigma = None    # character --> None
     else:
         old_vol_sigma = float(old_vol_sigma)    # character --> float
-    old_mindist = stat.get('structure', 'mindist')
-    if old_mindist == 'None':
-        old_mindist = None    # character --> None
-    else:
+    try:    # case: None
+        old_mindist = stat.get('structure', 'mindist')
+        if old_mindist == 'None':
+            old_mindist = None    # character --> None
+    except (configparser.NoOptionError, configparser.NoSectionError):
         old_mindist = []
         for i in range(len(atype)):
             tmp = stat.get('structure', 'mindist_{}'.format(i+1))
@@ -1044,7 +1073,8 @@ def diffinstat(stat):
     old_append_struc_ea = stat.getboolean('option', 'append_struc_ea')
     old_energy_step_flag = stat.getboolean('option', 'energy_step_flag')
     old_struc_step_flag = stat.getboolean('option', 'struc_step_flag')
-    old_fs_step_flag = stat.getboolean('option', 'fs_step_flag')
+    old_force_step_flag = stat.getboolean('option', 'force_step_flag')
+    old_stress_step_flag = stat.getboolean('option', 'stress_step_flag')
 
     # ---------- check difference
     # ------ basic
@@ -1105,6 +1135,10 @@ def diffinstat(stat):
     if not old_timeout_mol == timeout_mol:
         diff_out('timeout_mol', old_timeout_mol, timeout_mol)
         io_stat.set_input_common(stat, sec, 'timeout_mol', timeout_mol)
+        logic_change = True
+    if not old_rot_mol == rot_mol:
+        diff_out('rot_mol', old_rot_mol, rot_mol)
+        io_stat.set_input_common(stat, sec, 'rot_mol', rot_mol)
         logic_change = True
     if not old_vol_factor == vol_factor:
         diff_out('vol_factor', old_vol_factor, vol_factor)
@@ -1404,8 +1438,10 @@ def diffinstat(stat):
         raise ValueError('Do not change energy_step_flag')
     if not old_struc_step_flag == struc_step_flag:
         raise ValueError('Do not change struc_step_flag')
-    if not old_fs_step_flag == fs_step_flag:
-        raise ValueError('Do not change fs_step_flag')
+    if not old_force_step_flag == force_step_flag:
+        raise ValueError('Do not change force_step_flag')
+    if not old_stress_step_flag == stress_step_flag:
+        raise ValueError('Do not change stress_step_flag')
 
     # ---------- save stat if necessary
     if logic_change:

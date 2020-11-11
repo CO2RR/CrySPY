@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 '''
 Main script
 '''
@@ -59,10 +59,15 @@ def main():
             jobs.check_job()
             jobs.handle_job()
 
-    # ---------- next selection or generation
-    if rin.algo in ['BO', 'LAQA', 'EA']:
-        if not (jobs.id_queueing or jobs.id_running):
+    if not (jobs.id_queueing or jobs.id_running):
+        # ---------- next selection or generation
+        if rin.algo in ['BO', 'LAQA', 'EA']:
             jobs.next_sg()
+        # ---------- for RS
+        else:
+            with open('cryspy.out', 'a') as fout:
+                fout.write('\nDone all structures!\n')
+                print('Done all structures!')
 
     # ---------- unlock
     os.remove('lock_cryspy')

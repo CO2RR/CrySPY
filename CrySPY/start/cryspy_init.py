@@ -60,6 +60,13 @@ def initialize():
                 rsgx.gen_struc_mol(nstruc=rin.tot_struc, id_offset=0,
                                    init_pos_path='./data/init_POSCARS',
                                    timeout_mol=rin.timeout_mol)
+            # ------ molecular crystal breaking symmetry
+            elif rin.struc_mode == 'mol_bs':
+                rsgx.set_mol(mol_file=rin.mol_file, nmol=rin.nmol)
+                rsgx.gen_struc_mol_break_sym(nstruc=rin.tot_struc,
+                                             rot_mol=rin.rot_mol,
+                                             id_offset=0,
+                                             init_pos_path='./data/init_POSCARS')
             # ------ init_struc_data
             init_struc_data = rsgx.init_struc_data
         # ------ Rnd_struc_gen
@@ -122,32 +129,17 @@ def initialize():
 
     # ---------- initialize etc
     if rin.kpt_flag:
-        kpt_init()
+        kpt_data = {}
+        pkl_data.save_kpt(kpt_data)
     if rin.energy_step_flag:
-        energy_step_init()
+        energy_step_data = {}
+        pkl_data.save_energy_step(energy_step_data)
     if rin.struc_step_flag:
-        struc_step_init()
-    if rin.fs_step_flag:
-        fs_step_init()
-
-
-def kpt_init():
-    kpt_data = {}
-    pkl_data.save_kpt(kpt_data)
-
-
-def energy_step_init():
-    energy_step_data = {}
-    pkl_data.save_energy_step(energy_step_data)
-
-
-def struc_step_init():
-    struc_step_data = {}
-    pkl_data.save_struc_step(struc_step_data)
-
-
-def fs_step_init():
-    force_step_data = {}
-    stress_step_data = {}
-    fs_step_data = (force_step_data, stress_step_data)
-    pkl_data.save_fs_step(fs_step_data)
+        struc_step_data = {}
+        pkl_data.save_struc_step(struc_step_data)
+    if rin.force_step_flag:
+        force_step_data = {}
+        pkl_data.save_force_step(force_step_data)
+    if rin.stress_step_flag:
+        stress_step_data = {}
+        pkl_data.save_stress_step(stress_step_data)
