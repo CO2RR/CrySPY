@@ -238,22 +238,22 @@ def readin():
         append_struc_ea = False
     try:
         energy_step_flag = config.getboolean('option', 'energy_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
+        # -- only VASP or soaip for now
+        if calc_code in ['QE', 'LAMMPS', 'OMX']:
             energy_step_flag = False
     except (configparser.NoOptionError, configparser.NoSectionError):
         energy_step_flag = False
     try:
         struc_step_flag = config.getboolean('option', 'struc_step_flag')
-        # -- only VASP or QE for now
-        if calc_code in ['soiap', 'LAMMPS']:
+        # -- only VASP or soiap for now
+        if calc_code in ['QE', 'LAMMPS', 'OMX']:
             struc_step_flag = False
     except (configparser.NoOptionError, configparser.NoSectionError):
         struc_step_flag = False
     try:
         force_step_flag = config.getboolean('option', 'force_step_flag')
         # -- only VASP or soiap for now
-        if calc_code in ['QE', 'LAMMPS']:
+        if calc_code in ['QE', 'LAMMPS', 'OMX']:
             force_step_flag = False
     except (configparser.NoOptionError, configparser.NoSectionError):
         force_step_flag = False
@@ -262,7 +262,7 @@ def readin():
     try:
         stress_step_flag = config.getboolean('option', 'stress_step_flag')
         # -- only VASP or soiap for now
-        if calc_code in ['QE', 'LAMMPS']:
+        if calc_code in ['QE', 'LAMMPS', 'OMX']:
             stress_step_flag = False
     except (configparser.NoOptionError, configparser.NoSectionError):
         stress_step_flag = False
