@@ -14,7 +14,7 @@ from CrySPY.start import cryspy_init, cryspy_restart
 def main():
     # ---------- lock
     if os.path.isfile('lock_cryspy'):
-        raise SystemExit('lock_cryspy file exists hoge hoge')
+        raise SystemExit('lock_cryspy file exists')
     else:
         with open('lock_cryspy', 'w') as f:
             pass    # create vacant file

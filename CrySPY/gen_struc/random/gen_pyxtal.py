@@ -10,9 +10,8 @@ import sys
 
 import numpy as np
 from pymatgen import DummySpecie, Structure, Molecule
-from pyxtal.crystal import random_crystal
+from pyxtal import pyxtal
 from pyxtal.database.collection import Collection
-from pyxtal.molecular_crystal import molecular_crystal
 
 from ..struc_util import check_distance
 from ..struc_util import sort_by_atype
@@ -59,7 +58,7 @@ class Rnd_struc_gen_pyxtal:
                      tolerance for symmetry finding
     '''
 
-    def __init__(self, natot, atype, nat, vol_factor=[1.0, 1.0],
+    def __init__(self, natot, atype, nat, vol_factor=[1.1, 1.1],
                  vol_mu=None, vol_sigma=None,
                  mindist=None, spgnum='all', symprec=0.01):
         # ---------- check args
@@ -215,13 +214,21 @@ class Rnd_struc_gen_pyxtal:
             # ------ vol_factor
             rand_vol = random.uniform(self.vol_factor[0], self.vol_factor[1])
             # ------ generate structure
-            tmp_crystal = random_crystal(spg, self.atype,
-                                         self.nat, rand_vol)
+            tmp_crystal = pyxtal()
+            try:
+                tmp_crystal.from_random(dim=3, group=spg, species=self.atype,
+                                        numIons=self.nat, factor=rand_vol,
+                                        conventional=False)
+            except RuntimeError:
+                sys.stderr.write('RuntimeError in spg = {} retry.\n'.format(spg))
+                self.spg_error.append(spg)
+                continue
             if tmp_crystal.valid:
-                #tmp_struc = tmp_crystal.struct    # pymatgen Structure format, old pyxtal
                 tmp_struc = tmp_crystal.to_pymatgen()    # pymatgen Structure format
-                # -- check nat
+                # -- check the number of atoms
                 if not self._check_nat(tmp_struc):
+                    # (pyxtal 0.1.4) cryspy adopts "conventional=False",
+                    #     which is better for DFT calculation
                     # pyxtal returns conventional cell, that is, too many atoms
                     tmp_struc = tmp_struc.get_primitive_structure()
                     # recheck nat
@@ -331,7 +338,8 @@ class Rnd_struc_gen_pyxtal:
                 tmp_struc = q.get()
                 tmp_valid = q.get()
                 if tmp_struc == 'error':
-                    raise NameError('could not load  mol_file')
+                    self.spg_error.append(spg)
+                    continue
             if tmp_valid:
                 # -- scale volume
                 if self.vol_mu is not None:
@@ -343,6 +351,7 @@ class Rnd_struc_gen_pyxtal:
                         continue
                 # -- check nat
                 if not self._check_nat(tmp_struc):
+                    # cryspy adopts conventional=True
                     # pyxtal returns conventional cell,
                     # too many atoms if centering
                     tmp_struc = tmp_struc.get_primitive_structure()
@@ -439,8 +448,15 @@ class Rnd_struc_gen_pyxtal:
             # ------ vol_factor
             rand_vol = random.uniform(self.vol_factor[0], self.vol_factor[1])
             # ------ generate structure
-            tmp_crystal = random_crystal(spg, tmp_atype,
-                                         self.nmol, rand_vol)
+            tmp_crystal = pyxtal()
+            try:
+                tmp_crystal.from_random(dim=3, group=spg, species=tmp_atype,
+                                        numIons=self.nmol, factor=rand_vol,
+                                        conventional=False)
+            except RuntimeError:
+                sys.stderr.write('RuntimeError in spg = {} retry.\n'.format(spg))
+                self.spg_error.append(spg)
+                continue
             if tmp_crystal.valid:
                 # -- each wyckoff position --> dummy atom
                 dums = []        # dummy atoms
@@ -456,7 +472,6 @@ class Rnd_struc_gen_pyxtal:
                     dum_pos.append(site.position)
                     dum_type[dum] = site.specie
                 # -- tmp_struc with dummy atoms
-                spg = tmp_crystal.sg
                 lattice = tmp_crystal.lattice.get_matrix()
                 tmp_struc = Structure.from_spacegroup(spg, lattice, dums, dum_pos)
                 tmp_struc = tmp_struc.get_primitive_structure()
@@ -561,17 +576,22 @@ class Rnd_struc_gen_pyxtal:
         try:
             # ---------- temporarily stdout --> devnull
             with redirect_stdout(open(os.devnull, 'w')):
-                tmp_crystal = molecular_crystal(spg, self.mol_data,
-                                                self.nmol, rand_vol)
+                tmp_crystal = pyxtal(molecular=True)
+                tmp_crystal.from_random(dim=3, group=spg,
+                                        species=self.mol_data, numIons=self.nmol,
+                                        factor=rand_vol, conventional=False)
                 # ---------- queue
-                #q.put(tmp_crystal.struct)    # old pyxtal
             if tmp_crystal.valid:
                 q.put(tmp_crystal.to_pymatgen())
                 q.put(tmp_crystal.valid)
             else:
                 q.put(None)
                 q.put(tmp_crystal.valid)
-        except (NameError, np.linalg.LinAlgError):
-            # ------ no molecule file
+        except np.linalg.LinAlgError:
+            sys.stderr.write('np.linalg.LinAlgError in spg = {} retry.\n'.format(spg))
+            q.put('error')
+            q.put(None)
+        except RuntimeError:
+            sys.stderr.write('RuntimeError in spg = {} retry.\n'.format(spg))
             q.put('error')
             q.put(None)

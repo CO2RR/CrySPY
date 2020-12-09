@@ -61,7 +61,7 @@ def get_energy_magmom_vasp(work_path):
             energy = energy/float(rin.natot)       # eV/atom
             if 'mag=' in oszi[-1]:
                 magmom = float(oszi[-1].split()[-1])    # total magnetic moment
-    except FileNotFoundError:
+    except:
         pass
     # ---------- return
     return energy, magmom

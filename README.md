@@ -59,15 +59,12 @@ At least one optimizer is required.
 ### Others
 - [find_wy](https://github.com/nim-hrkn/find_wy "find_wy"): find_wy can randomly select a combination of Wyckoff positions for a given chemical composition and space group. (optional)
 
-## Document
+## Document (English/Japanese)
 [CrySPY document](https://tomoki-yamashita.github.io/CrySPY "CrySPY documment")
 
 ## Google group
 [Google gruop of CrySPY](https://groups.google.com/forum/#!forum/cryspy-user "Google group")
 
-
-## Tutorial (written in Japanese)
-[チュートリアルと解説](https://tomoki-yamashita.github.io/cryspy/tutorial/outline.html "tutorial")
 
 
 ## Reference

@@ -315,7 +315,7 @@ def readin():
         try:
             fp_npoints = config.getint('BO', 'fp_npoints')
         except configparser.NoOptionError:
-            fp_npoints = 50
+            fp_npoints = 20
         if fp_npoints <= 0:
             raise ValueError('fp_npoints <= 0, check fp_npoints')
         try:
