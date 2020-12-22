@@ -224,7 +224,7 @@ class Rnd_struc_gen_pyxtal:
                 self.spg_error.append(spg)
                 continue
             if tmp_crystal.valid:
-                tmp_struc = tmp_crystal.to_pymatgen()    # pymatgen Structure format
+                tmp_struc = tmp_crystal.to_pymatgen(resort=False)    # pymatgen Structure format
                 # -- check the number of atoms
                 if not self._check_nat(tmp_struc):
                     # (pyxtal 0.1.4) cryspy adopts "conventional=False",
@@ -582,7 +582,7 @@ class Rnd_struc_gen_pyxtal:
                                         factor=rand_vol, conventional=False)
                 # ---------- queue
             if tmp_crystal.valid:
-                q.put(tmp_crystal.to_pymatgen())
+                q.put(tmp_crystal.to_pymatgen(resort=False))
                 q.put(tmp_crystal.valid)
             else:
                 q.put(None)

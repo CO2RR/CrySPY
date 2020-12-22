@@ -1,4 +1,4 @@
-![cryspy_logo](./docs/_images/cryspy_fix-03.png)
+![cryspy_logo](./cryspy_fix-03.png)
 
 # CrySPY
 CrySPY is a crystal structure prediction tool written in Python.  
@@ -43,7 +43,7 @@ version 0.9.0 (2020 ???? ??)
 - Python 3.x.x
 - [COMBO](https://github.com/tsudalab/combo3 "COMBO")
 - [pymatgen](http://pymatgen.org "pymatgen")
-- [PyXtal](https://pyxtal.readthedocs.io/en/latest "PyXtal")
+- [PyXtal >= 0.1.6](https://pyxtal.readthedocs.io/en/latest "PyXtal")
 
 Tested with Python 3.8.5 on Mac and Python 3.8.2, 3.8.3 on Linux.
 
